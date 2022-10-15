@@ -9,6 +9,7 @@ import sys
 # global variables stored options value
 is_debug = False
 log_file = ''
+djob_path = ''
 job_ids = []
 job_name = ''
 job_state = ''
@@ -187,7 +188,8 @@ def parse_query_result(query_lines):
 
 
 def get_job_dict():
-    query_command = 'djob'
+    global djob_path
+    query_command = djob_path
     # check job users
     # normal user could not cancel others' job
     if len(job_user) > 0:
@@ -235,16 +237,38 @@ def cancel_jobs(cancel_job_dict):
     if len(cancel_job_dict) == 0:
         return
     cancel_ids = cancel_job_dict.keys()
-    cancel_command = 'djob -T %s > /dev/null' % ' '.join(cancel_ids)
+    global djob_path
+    cancel_command = '%s -T %s > /dev/null' % (djob_path, ' '.join(cancel_ids))
     log('cancel command : %s' % cancel_command)
     # execute command
     os.popen(cancel_command).read()
+
+
+def check_donau_cli_env():
+    sched_cli_home = os.getenv('CCSCHEDULER_CLI_HOME')
+    ccs_cli_home = os.getenv('CCS_CLI_HOME')
+    ca_cert_perm = os.getenv('CURL_CA_BUNDLE')
+    if sched_cli_home is None or ccs_cli_home is None or ca_cert_perm is None:
+        print('cli env home is not configured, '
+              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
+        sys.exit(1)
+    if ca_cert_perm is not None:
+        print('cli ca_cert_perm is not specified,'
+              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
+        sys.exit(1)
+    global djob_path
+    djob_path = os.path.join(ccs_cli_home, 'bin', 'djob')
+    if not os.path.exists(djob_path):
+        print('djob path is not exist,'
+              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
+        sys.exit(1)
 
 
 if __name__ == '__main__':
     if os.getuid() == 0:
         print('Permission denied. The root user is not allowed to operate.')
         sys.exit(1)
+    check_donau_cli_env()
     init_config_with_env()
     short_options = '-n:-t:-u:-p:'
     long_options = ['help', 'name=', 'state=', 'user=', 'partition=', 'usage']

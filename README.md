@@ -1,10 +1,10 @@
 # donau-slurm-wrappers
 
 #### 介绍
-donau-slurm-wrappers provide some scripts for Slurm Users to submit and manage jobs in Donau cluster environment
+donau-slurm-wrappers提供了一些slurm命名风格的脚本，方便习惯使用slurm的用户快速上手donau的业务。
 
 #### 软件架构
-软件架构说明
+python2/python3
 
 
 #### 安装教程
@@ -15,9 +15,13 @@ donau-slurm-wrappers provide some scripts for Slurm Users to submit and manage j
 
 #### 使用说明
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+1.  srun命令
+2.  sbatch命令
+3.  squeue命令
+4.  scancel命令
+5.  sinfo命令
+6.  scontrol命令
+7.  sacct命令
 
 #### 参与贡献
 

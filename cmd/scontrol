@@ -10,6 +10,7 @@ is_debug = False
 is_suspend = False
 is_resume = False
 log_file = ''
+djob_path = ''
 job_ids = []
 job_err_info = []
 # custom query result index
@@ -173,7 +174,8 @@ def append_err_message(err_output):
 
 
 def job_control():
-    query_command = 'djob -x -CO \"JOB_ID TASK_INDEX TASK_STATE\"'
+    global djob_path
+    query_command = '%s -x -CO \"JOB_ID TASK_INDEX TASK_STATE\"' % djob_path
     query_job_ids = ' '.join(job_ids)
     query_command += ' ' + query_job_ids
     log('get query_command: %s' % query_command)
@@ -213,7 +215,7 @@ def job_control():
         if not check_task_state(id, task_state_list):
             continue
         # control command
-        action_command = 'djob'
+        action_command = djob_path
         if is_suspend:
             action_command += ' -S '
         elif is_resume:
@@ -233,10 +235,31 @@ def job_control():
             append_err_message(output)
 
 
+def check_donau_cli_env():
+    sched_cli_home = os.getenv('CCSCHEDULER_CLI_HOME')
+    ccs_cli_home = os.getenv('CCS_CLI_HOME')
+    ca_cert_perm = os.getenv('CURL_CA_BUNDLE')
+    if sched_cli_home is None or ccs_cli_home is None or ca_cert_perm is None:
+        print('cli env home is not configured, '
+              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
+        sys.exit(1)
+    if ca_cert_perm is not None:
+        print('cli ca_cert_perm is not specified,'
+              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
+        sys.exit(1)
+    global djob_path
+    djob_path = os.path.join(ccs_cli_home, 'bin', 'djob')
+    if not os.path.exists(djob_path):
+        print('djob path is not exist,'
+              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
+        sys.exit(1)
+
+
 if __name__ == '__main__':
     if os.getuid() == 0:
         print('Permission denied. The root user is not allowed to operate.')
         sys.exit(1)
+    check_donau_cli_env()
     init_config_with_env()
     short_options = ''
     long_options = ['help']

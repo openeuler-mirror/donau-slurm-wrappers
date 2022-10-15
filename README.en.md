@@ -4,7 +4,7 @@
 donau-slurm-wrappers provide some scripts for Slurm Users to submit and manage jobs in Donau cluster environment
 
 #### Software Architecture
-Software architecture description
+python2/python3
 
 #### Installation
 
@@ -14,9 +14,13 @@ Software architecture description
 
 #### Instructions
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+1.  srun
+2.  sbatch
+3.  squeue
+4.  scancel
+5.  sinfo
+6.  scontrol
+7.  sacct
 
 #### Contribution
 

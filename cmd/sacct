@@ -11,6 +11,7 @@ is_debug = False
 is_brief = False
 has_print_title = False
 log_file = ""
+djob_path = ''
 # global variables stored options value
 job_ids = []
 job_names = []
@@ -207,7 +208,8 @@ def check_result_error(out_line):
 
 
 def get_job_dict():
-    query_command = 'djob'
+    global djob_path
+    query_command = djob_path
     # check job_users
     # -u/--user only takes effect while user is administrator
     if is_administrator():
@@ -320,7 +322,8 @@ def print_job_info(job_info):
 
 
 def print_query_job_info(info_dict):
-    query_custom_command = 'djob -x -CO "JOB_ID ALLOC_CPU EXIT_CODE EXIT_MESSAGE"'
+    global djob_path
+    query_custom_command = '%s -x -CO "JOB_ID ALLOC_CPU EXIT_CODE EXIT_MESSAGE"' % djob_path
     for job_id in info_dict.keys():
         query_custom_command = '%s %s' % (query_custom_command, job_id)
     log('query_custom_command: %s' % query_custom_command)
@@ -367,10 +370,31 @@ def print_query_job_info(info_dict):
             print_job_info(job_info)
 
 
+def check_donau_cli_env():
+    sched_cli_home = os.getenv('CCSCHEDULER_CLI_HOME')
+    ccs_cli_home = os.getenv('CCS_CLI_HOME')
+    ca_cert_perm = os.getenv('CURL_CA_BUNDLE')
+    if sched_cli_home is None or ccs_cli_home is None or ca_cert_perm is None:
+        print('cli env home is not configured, '
+              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
+        sys.exit(1)
+    if ca_cert_perm is not None:
+        print('cli ca_cert_perm is not specified,'
+              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
+        sys.exit(1)
+    global djob_path
+    djob_path = os.path.join(ccs_cli_home, 'bin', 'djob')
+    if not os.path.exists(djob_path):
+        print('djob path is not exist,'
+              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
+        sys.exit(1)
+
+
 if __name__ == '__main__':
     if os.getuid() == 0:
         print('Permission denied. The root user is not allowed to operate.')
         sys.exit(1)
+    check_donau_cli_env()
     init_config_with_env()
     short_options = '-b-S:-E:-j:-s:-u:-r:'
     long_options = ['brief', 'jobs=', 'help', 'name=', 'state=', 'user=',
