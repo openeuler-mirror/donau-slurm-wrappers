@@ -1,0 +1,586 @@
+#!/usr/bin/python
+
+from __future__ import print_function
+
+import getopt
+import os
+import sys
+from datetime import datetime
+import re
+
+# opt_hit_map = {'p' : 'pvalue', }
+opts_hit_map = {}
+
+# output_head_list = ['NODELIST', 'NODES', 'PARTITION', 'STATE']
+output_head_list = []
+
+# output_target_value_list = ['all', '3']
+output_target_values_list = []
+
+# donau_cmd_list = {'dnode -L':"-------\nmessage\n", 'dnode -aff':""}
+executed_donau_cmd_dict = {}
+
+def print_help():
+    print("""Usage: sinfo [OPTIONS]
+  -l, --long                 long output - displays more information
+  -p, --partition=PARTITION  report on specific partition
+  -N, --Node                 Node-centric format
+  -n, --nodes=NODES          report on specific node(s)
+    
+Help options:
+  --help                     show this help message
+  --usage                    display brief usage message""")
+# print_help()
+
+def print_usage():
+    print("Usage: sinfo [-lN] [-p partition] [-n nodes]")
+# print_usage()
+
+def print_slurm_cmd_invalid_opt_response(opt):
+    print("sinfo: %s"%(opt))
+    print("Try \"sinfo --help\" for more information")
+
+def print_datetime():
+    time = datetime.now()
+    print(time.strftime('%a %b %d %H:%M:%S %Y'))
+
+def check_token():
+    cmd_ret = os.system("dnode >/dev/null 2>&1")
+    if cmd_ret == 0:
+        return
+    else:
+        print("error: token expired! refresh token does not exist, please execute command dconfig to get token")
+        sys.exit(1)
+
+def execute_cmd(cmd):
+    # with open(filename, 'r') as fin:
+    #     ret = fin.readlines()
+    # return ret
+    f = os.popen(cmd).read().split('\n')
+    return f
+
+def get_slurm_cmd_opts_hit_map(opts, args):
+    global opts_hit_map
+    for opt, value in opts:
+        if opt in ("--help"):
+            print_help()
+            sys.exit(0)
+            return True
+        if opt in ("--usage"):
+            print_usage()
+            sys.exit(0)
+            return True
+        if opt in ("-n", "--nodes", "--node"):
+            opts_hit_map["n"] = value
+        elif opt in ("-p", "--partition"):
+            opts_hit_map["p"] = value
+        elif opt in ("-l"):
+            opts_hit_map["l"] = value
+        elif opt in ("-N"):
+            opts_hit_map["N"] = value
+        else:
+            print_slurm_cmd_invalid_opt(opt)
+            return False
+    return True
+
+def get_output_head_list():
+    global output_head_list
+    global opts_hit_map
+    if len(opts_hit_map) is 0:
+        output_head_list = ['PARTITION', 'AVAIL', 'TIMELIMIT', 'NODES', 'STATE', 'NODELIST']
+        return
+    # combination keys
+    keys = list(opts_hit_map.keys())
+    if 'l' in keys and 'N' in keys:
+        output_head_list = ['NODELIST', 'NODES', 'PARTITION', 'STATE', 'CPUS', 'S:C:T', 'MEMORY', 'TMP_DISK', 'WEIGHT', 'AVAIL_FE', 'REASON']
+        return
+    if 'l' in keys and 'n' in keys:
+        output_head_list = ['PARTITION', 'AVAIL', 'TIMELIMIT', 'JOB_SIZE', 'ROOT', 'OVERSUBS', 'GROUPS', 'NODES', 'STATE', 'NODELIST']
+        return
+    # single key
+    for key, value in opts_hit_map.items():
+        if key is "l":
+            output_head_list = ['PARTITION', 'AVAIL', 'TIMELIMIT', 'JOB_SIZE', 'ROOT', 'OVERSUBS', 'GROUPS', 'NODES', 'STATE', 'NODELIST']
+        elif key is "N":
+            output_head_list = ['NODELIST', 'NODES', 'PARTITION', 'STATE']
+        elif key is "n":
+            output_head_list = ['PARTITION', 'AVAIL', 'TIMELIMIT', 'NODES', 'STATE', 'NODELIST']
+        elif key is "p":
+            output_head_list = ['PARTITION', 'AVAIL', 'TIMELIMIT', 'NODES', 'STATE', 'NODELIST']
+        else:
+            print(key, value)
+            return
+
+def get_invalid_option_response(err_message):
+    if "not recognized" in err_message:
+        options = re.findall(r'option (.*) not recognized', err_message)
+        if len(options) == 1:
+            return "invalid option '%s'"%options[0]
+    if "requires argument" in err_message:
+        options = re.findall(r'option (.*) requires argument', err_message)
+        if len(options) == 1:
+            return "option requires an argument '%s'"%options[0]
+    return ""
+
+
+# mapping 'slurm_output_head'  -> 'donau_cmd -> 'slurm_output_target_value'
+def get_target_value_PARTITION():
+    global executed_donau_cmd_dict
+    global output_head_list
+    
+    cmd = "dqueue"
+    if cmd not in executed_donau_cmd_dict.keys():
+        executed_donau_cmd_dict[cmd] = execute_cmd(cmd)
+    result = executed_donau_cmd_dict[cmd]
+    pars = []
+    for index in range(1, len(result)):
+        if len(result[index]) == 0:
+            continue
+        pars.append(result[index].split()[0])
+    cmd = "dnode"
+    if cmd not in executed_donau_cmd_dict.keys():
+        executed_donau_cmd_dict[cmd] = execute_cmd(cmd)
+    result = executed_donau_cmd_dict[cmd]
+    ret = []
+    for index in range(1, len(result)):
+        if len(result[index]) == 0:
+            continue
+        ret.append(",".join(pars))
+    return ret
+
+def get_target_value_NODELIST():
+    global executed_donau_cmd_dict
+    cmd = "dnode"
+    if cmd not in executed_donau_cmd_dict.keys():
+        executed_donau_cmd_dict[cmd] = execute_cmd(cmd)
+    result = executed_donau_cmd_dict[cmd]
+    ret = []
+    for index in range(1, len(result)):
+        if len(result[index]) == 0:
+            continue
+        ret.append(result[index].split()[0])
+    return ret
+
+def get_target_value_NODES():
+    global executed_donau_cmd_dict
+    cmd = "dnode"
+    if cmd not in executed_donau_cmd_dict.keys():
+        executed_donau_cmd_dict[cmd] = execute_cmd(cmd)
+    result = executed_donau_cmd_dict[cmd]
+    ret = []
+    for index in range(1, len(result)):
+        if len(result[index]) == 0:
+            continue
+        ret.append("1")
+    return ret
+
+def get_target_value_STATE():
+    global executed_donau_cmd_dict
+    cmd = "dnode -L"
+    if cmd not in executed_donau_cmd_dict.keys():
+        executed_donau_cmd_dict[cmd] = execute_cmd(cmd)
+    result = executed_donau_cmd_dict[cmd]
+    cpu_free, mcpu = 0, 0
+    ret = []
+    isFirst = True
+    for line in result:
+        lst = line.split()
+        if len(lst) == 2 and lst[0][0] == '-' and lst[1][0] == '-':
+            if isFirst == False:
+                if cpu_free == 0:
+                    ret.append("alloc")
+                elif cpu_free < mcpu and cpu_free:
+                    ret.append("mix")
+                else:
+                    ret.append("idle")
+            else:
+                isFirst = False
+            cpu_free, mcpu = 0, 0
+            continue
+        if len(lst) == 2 and lst[0] == "loadResources.cpuFree":
+            cpu_free = int(lst[1])
+        elif len(lst) == 2 and lst[0] == "nativeResources.mCpu":
+            mcpu = int(lst[1])
+    if cpu_free == 0:
+        ret.append("alloc")
+    elif cpu_free < mcpu and cpu_free:
+        ret.append("mix")
+    else:
+        ret.append("idle")
+    return ret
+
+def get_target_value_CPUS():
+    global executed_donau_cmd_dict
+    cmd = "dnode -L"
+    if cmd not in executed_donau_cmd_dict.keys():
+        executed_donau_cmd_dict[cmd] = execute_cmd(cmd)
+    result = executed_donau_cmd_dict[cmd]
+    ret = []
+    for line in result:
+        lst = line.split()
+        if len(lst) == 2 and lst[0] == "nativeResources.mCpu":
+            ret.append(str(lst[1]))
+    return ret
+
+def get_target_value_SCT():
+    global executed_donau_cmd_dict
+    cmd = "dnode -aff"
+    if cmd not in executed_donau_cmd_dict.keys():
+        executed_donau_cmd_dict[cmd] = execute_cmd(cmd)
+    result = executed_donau_cmd_dict[cmd]
+    cnt_S_lst, cnt_C_lst, cnt_T_lst = [], [], []
+    cnt_S, cnt_C, cnt_T = 0, 0, 0
+    isFirst = True
+    for line in result:
+        lst = line.split()
+        # new node info split by line "------ ----------"
+        if len(lst) == 2 and lst[0][0] == '-' and lst[1][0] == '-':
+            if isFirst is False:
+                cnt_S_lst.append(cnt_S)
+                cnt_C_lst.append(cnt_C)
+                cnt_T_lst.append(cnt_T)
+            else:
+                isFirst = False
+            cnt_S, cnt_C, cnt_T = 0, 0, 0
+            continue
+        for element in lst:
+            if "socket(" in element:
+                cnt_S += 1
+            elif "core(" in element:
+                cnt_C += 1
+            elif "thread(" in element:
+                cnt_T += element.count(',') + 1
+    cnt_S_lst.append(cnt_S)
+    cnt_C_lst.append(cnt_C)
+    cnt_T_lst.append(cnt_T)
+    ret = []
+    for index in range(len(cnt_C_lst)):
+        ret.append(":".join([str(cnt_S_lst[index]), str(cnt_C_lst[index]), str(cnt_T_lst[index])]))
+    return ret
+
+def get_target_value_MEMORY():
+    global executed_donau_cmd_dict
+    cmd = "dnode -L"
+    if cmd not in executed_donau_cmd_dict.keys():
+        executed_donau_cmd_dict[cmd] = execute_cmd(cmd)
+    result = executed_donau_cmd_dict[cmd]
+    ret = []
+    for line in result:
+        lst = line.split()
+        if len(lst) == 2 and lst[0] == "nativeResources.mem":
+            ret.append(str(lst[1]))
+    return ret
+
+def get_target_value_TMP_DISK():
+    global executed_donau_cmd_dict
+    cmd = "dnode -L"
+    if cmd not in executed_donau_cmd_dict.keys():
+        executed_donau_cmd_dict[cmd] = execute_cmd(cmd)
+    result = executed_donau_cmd_dict[cmd]
+    ret = []
+    for line in result:
+        lst = line.split()
+        if len(lst) == 2 and lst[0] == "loadResources.tmpTotal":
+            ret.append(lst[1])
+    return ret
+
+def get_target_value_WEIGHT():
+    global executed_donau_cmd_dict
+    cmd = "dnode"
+    if cmd not in executed_donau_cmd_dict.keys():
+        executed_donau_cmd_dict[cmd] = execute_cmd(cmd)
+    result = executed_donau_cmd_dict[cmd]
+    ret = []
+    for index in range(1, len(result)):
+        if len(result[index]) == 0:
+            continue
+        ret.append("1")
+    return ret
+
+def get_target_value_AVAIL_FE():
+    global executed_donau_cmd_dict
+    cmd = "dnode"
+    if cmd not in executed_donau_cmd_dict.keys():
+        executed_donau_cmd_dict[cmd] = execute_cmd(cmd)
+    result = executed_donau_cmd_dict[cmd]
+    ret = []
+    for index in range(1, len(result)):
+        if len(result[index]) == 0:
+            continue
+        ret.append("(null)")
+    return ret
+
+def get_target_value_REASON():
+    global executed_donau_cmd_dict
+    cmd = "dnode"
+    if cmd not in executed_donau_cmd_dict.keys():
+        executed_donau_cmd_dict[cmd] = execute_cmd(cmd)
+    result = executed_donau_cmd_dict[cmd]
+    ret = []
+    for index in range(1, len(result)):
+        if len(result[index]) == 0:
+            continue
+        ret.append("none")
+    return ret
+
+def get_target_value_AVAIL():
+    global executed_donau_cmd_dict
+    cmd = "dqueue"
+    if cmd not in executed_donau_cmd_dict.keys():
+        executed_donau_cmd_dict[cmd] = execute_cmd(cmd)
+    result = executed_donau_cmd_dict[cmd]
+    ret = []
+    for index in range(1, len(result)):
+        if len(result[index]) == 0:
+            continue
+        lst = result[index].split()
+        if len(lst) >= 2 and lst[1] == "OPEN,ACTIVE":
+            ret.append("up")
+        elif len(lst) >= 2 and lst[1] == "CLOSED,INACTIVE":
+            ret.append("down")
+        else:
+            ret.append("down")
+    return ret
+    
+def get_target_value_GROUPS():
+    global executed_donau_cmd_dict
+    cmd = "dqueue -L"
+    if cmd not in executed_donau_cmd_dict.keys():
+        executed_donau_cmd_dict[cmd] = execute_cmd(cmd)
+    result = executed_donau_cmd_dict[cmd]
+    ret = []
+    preIsUserGroups = False
+    for index in range(1, len(result)):
+        if len(result[index]) == 0:
+            continue
+        lst = result[index].split()
+        if len(lst) == 1 and lst[0] == "userGroups:":
+            preIsUserGroups = True
+            continue
+        elif len(lst) == 1 and preIsUserGroups == True:
+            preIsUserGroups = False
+            if lst[0] == "*":
+                ret.append("all")
+            else:
+                ret.append(lst[0])
+    return ret
+    
+def get_target_value_TIMELIMIT():
+    global executed_donau_cmd_dict
+    cmd = "dnode"
+    if cmd not in executed_donau_cmd_dict.keys():
+        executed_donau_cmd_dict[cmd] = execute_cmd(cmd)
+    result = executed_donau_cmd_dict[cmd]
+    ret = []
+    for index in range(1, len(result)):
+        if len(result[index]) == 0:
+            continue
+        ret.append("infinite")
+    return ret
+
+def get_target_value_JOB_SIZE():
+    global executed_donau_cmd_dict
+    cmd = "dnode"
+    if cmd not in executed_donau_cmd_dict.keys():
+        executed_donau_cmd_dict[cmd] = execute_cmd(cmd)
+    result = executed_donau_cmd_dict[cmd]
+    ret = []
+    for index in range(1, len(result)):
+        if len(result[index]) == 0:
+            continue
+        ret.append("1-infinite")
+    return ret
+
+def get_target_value_ROOT():
+    global executed_donau_cmd_dict
+    cmd = "dnode"
+    if cmd not in executed_donau_cmd_dict.keys():
+        executed_donau_cmd_dict[cmd] = execute_cmd(cmd)
+    result = executed_donau_cmd_dict[cmd]
+    ret = []
+    for index in range(1, len(result)):
+        if len(result[index]) == 0:
+            continue
+        ret.append("no")
+    return ret
+
+def get_target_value_OVERSUBS():
+    global executed_donau_cmd_dict
+    cmd = "dnode"
+    if cmd not in executed_donau_cmd_dict.keys():
+        executed_donau_cmd_dict[cmd] = execute_cmd(cmd)
+    result = executed_donau_cmd_dict[cmd]
+    ret = []
+    for index in range(1, len(result)):
+        if len(result[index]) == 0:
+            continue
+        ret.append("NO")
+    return ret
+
+def func_default():
+    return "null"
+
+function_map = {
+    "PARTITION": get_target_value_PARTITION,
+    "NODELIST": get_target_value_NODELIST,
+    "NODES" : get_target_value_NODES,
+    "STATE": get_target_value_STATE,
+    "CPUS": get_target_value_CPUS,
+    "S:C:T": get_target_value_SCT,
+    "MEMORY": get_target_value_MEMORY,
+    "TMP_DISK": get_target_value_TMP_DISK,
+    "WEIGHT": get_target_value_WEIGHT,
+    "REASON": get_target_value_REASON,
+    "AVAIL": get_target_value_AVAIL,
+    "GROUPS": get_target_value_GROUPS,
+    "TIMELIMIT": get_target_value_TIMELIMIT,
+    "JOB_SIZE": get_target_value_JOB_SIZE,
+    "ROOT": get_target_value_ROOT,
+    "OVERSUBS": get_target_value_OVERSUBS,
+    "AVAIL_FE": get_target_value_AVAIL_FE,
+}
+
+def check_donau_cli_env():
+    sched_cli_home = os.getenv('CCSCHEDULER_CLI_HOME')
+    ccs_cli_home = os.getenv('CCS_CLI_HOME')
+    ca_cert_perm = os.getenv('CURL_CA_BUNDLE')
+    if sched_cli_home is None or ccs_cli_home is None or ca_cert_perm is None:
+        print("cli env home is not configured, source configure 'profile.env'(bash) or 'cshrc.env'(csh) first")
+        sys.exit(1)
+    if ca_cert_perm is None:
+        print("cli ca_cert_perm is not specified, source configure 'profile.env'(bash) or 'cshrc.env'(csh) first")
+        sys.exit(1)
+    global dnode_path
+    # djob_path = os.path.join(ccs_cli_home, 'bin', 'dnode')
+    dnode_path = os.path.join(ccs_cli_home, 'bin', 'dnode')
+    dqueue_path = os.path.join(ccs_cli_home, 'bin', 'dqueue')
+    if not os.path.exists(dnode_path):
+        print("dnode path is not exist, source configure 'profile.env'(bash) or 'cshrc.env'(csh) first")
+        sys.exit(1)
+    if not os.path.exists(dqueue_path):
+        print("dqueue path is not exist, source configure 'profile.env'(bash) or 'cshrc.env'(csh) first")
+        sys.exit(1)
+
+def get_output_target_values():
+    global output_head_list
+    global output_target_values_list
+    output_target_values_list = [[] for i in range(len(output_head_list))]
+    index = 0
+    executed_donau_cmd_dict.clear()
+    for head in output_head_list:
+        func = function_map.get(head, func_default)
+        output_target_values_list[index] = func()
+        index += 1
+
+def select_ret_with_opts(opts):
+    global opts_hit_map
+    global output_head_list
+    global output_target_values_list
+    keys = list(opts_hit_map.keys())
+    
+    new_ret = [[] for i in range(len(output_head_list))]
+    new_ret_id = []
+    if 'p' in keys:
+        value = opts_hit_map.get('p')
+        p_index = output_head_list.index("PARTITION")
+        for i in range(len(output_target_values_list[p_index])):
+            if output_target_values_list[p_index][i] == value:
+                for l in range(len(new_ret)):
+                    new_ret[l].append(output_target_values_list[l][i])
+        output_target_values_list = new_ret
+    
+    new_ret = [[] for i in range(len(output_head_list))]
+    if 'n' in keys:
+        value = opts_hit_map['n']
+        p_index = 0
+        for i in range(len(output_head_list)):
+            if output_head_list[i] == "NODELIST":
+                p_index = i
+                break
+        for i in range(len(output_target_values_list[p_index])):
+            if output_target_values_list[p_index][i] == value:
+                for l in range(len(new_ret)):
+                    new_ret[l].append(output_target_values_list[l][i])
+        output_target_values_list = new_ret
+
+def extend_with_partirion():
+    global output_head_list
+    global output_target_values_list
+    if "PARTITION" not in output_head_list:
+        return
+    if len(output_target_values_list) == 0:
+        return
+    new_ret = [[] for i in range(len(output_head_list))]
+    for index in range(len(output_target_values_list[0])):
+        raw_out_line = [output_target_values_list[i][index] for i in range(len(output_head_list))]
+        partition_index = output_head_list.index("PARTITION")
+        # print(raw_out_line)
+        for single_partition in raw_out_line[partition_index].split(','):
+            new_out_line = raw_out_line
+            new_out_line[partition_index] = single_partition
+            for i in range(len(output_head_list)):
+                new_ret[i].append(new_out_line[i])
+    output_target_values_list = new_ret
+
+def print_format():
+    global output_target_values_list
+    global output_head_list
+    global opts_hit_map
+    if len(output_target_values_list) == 0:
+        return
+    
+    
+    keys = list(opts_hit_map.keys())
+    if "l" in keys:
+        print_datetime()
+    
+    mx_len = [0 for i in range(len(output_head_list))]
+    for i in range(len(output_head_list)):
+        mx_len[i] = max(mx_len[i], len(output_head_list[i]))
+        if len(output_target_values_list[i]) == 0:
+            continue
+        for element in output_target_values_list[i]:
+            mx_len[i] = max(mx_len[i], len(element))
+    for i in range(len(output_head_list)-1):
+        print(output_head_list[i].ljust(mx_len[i]), end=' ')
+    print(output_head_list[-1].ljust(mx_len[-1]))
+    
+    if len(output_target_values_list[0]) == 0:
+        return
+    for i in range(len(output_target_values_list[0])):
+        out_line = [output_target_values_list[j][i] for j in range(len(output_head_list))]
+        for j in range(len(out_line)-1):
+            print(out_line[j].ljust(mx_len[j]), end=' ')
+        print(out_line[-1].ljust(mx_len[-1]))
+
+
+if __name__ == '__main__':
+    if os.getuid() == 0:
+        print("Permission denied. The root user is not allowed to operate.")
+        sys.exit(1)
+    check_donau_cli_env()
+    check_token()
+    try:
+        opts_hit_map.clear()
+        # argstr = "sinfo.py -l".split()
+        # opts, args = getopt.getopt(argstr[1:], "hn:Np:l", ["help", "nodes=", "Node", "partitions=", "usage"])
+        
+        opts, args = getopt.getopt(sys.argv[1:], "n:Np:l", ["help", "nodes=", "Node", "partition=", "usage"])
+        
+        # print("[DEBUG]: ", "opts=", opts, "args=", args)
+        is_opts_allright = get_slurm_cmd_opts_hit_map(opts, args)
+        if is_opts_allright == False:
+            exit(0)
+        get_output_head_list()
+        # print("[DEBUG]: ", "output_head_list=", output_head_list)
+        is_ok = get_output_target_values()
+        
+        extend_with_partirion()        
+        # print(output_target_values_list)
+        select_ret_with_opts(opts)
+        # print(output_target_values_list)
+        print_format()
+        
+    except getopt.GetoptError as err:
+        invalid_option = get_invalid_option_response(str(err))
+        print_slurm_cmd_invalid_opt_response(invalid_option)
