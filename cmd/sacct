@@ -61,7 +61,7 @@ JOB_PARTITION_LEN_LIMIT = 10
 
 def get_help_info():
     help_info = '''Usage: sacct [OPTIONS]
-  -b, --brief:                    Equivalent to '--format=jobstep,state,error'.
+  -b, --brief:                    Equivalent to '--format=jobid,state,error'.
   -S, --starttime:                Select jobs eligible after this time,
                                   default is 00:00:00 of the current day,
                                   is may be used with '-s' to specify job states,
@@ -73,7 +73,9 @@ def get_help_info():
   -r, --partition:                comma separated list of job partitions to view, default all
   -s, --state:                    comma separated list of states to view,
                                   only support 'cd/completed', 'r/running' and 'f/failed'
-  -u, --user:                     comma separated list of user names to view
+  -u, --user:                     comma separated list of user names to view,
+                                  this option only takes effect while user is administrator,
+                                  normal user can not query other user's job
   -j, --jobs:                     comma separated list of jobs IDs to view, default is all
   
 Help options:
@@ -198,8 +200,17 @@ def print_title():
 
 
 def check_result_error(out_line):
+    global job_err_info
     # check permission
     if 'access to job' in out_line:
+        err_list = out_line.split()
+        job_err_info.append(' '.join(err_list[1:]))
+        return False
+    if out_line.startswith('---'):
+        return False
+    if 'not exist' in out_line:
+        err_list = out_line.split()
+        job_err_info.append(' '.join(err_list[1:]))
         return False
     out_job_info = out_line.split()
     if len(out_job_info) > 0 and out_job_info[0].isdigit():
@@ -216,6 +227,8 @@ def get_job_dict():
         log('current user is administrator')
         if len(job_users) > 0:
             query_command += ' -u ' + '\'' + ' '.join(job_users) + '\''
+        else:
+            query_command += ' -u all '
     else:
         log('current user is not administrator')
         for user_name in job_users:
@@ -251,12 +264,10 @@ def get_job_dict():
         return job_dict
     # check result error, check second line is valid output
     valid_info = []
-    global job_err_info
     for info in job_info[1:]:
         if not check_result_error(info):
             log('check djob result error: %s' % info)
             print_title()
-            job_err_info.append(info)
         else:
             valid_info.append(info)
 
@@ -275,6 +286,21 @@ def parse_err_code(exit_msg):
             if error_code > 128:
                 return error_code - 128
     return 0
+
+
+def convert_specified_states():
+    global job_states
+    upper_states = []
+    for state in job_states:
+        if state.upper() == 'CA' or state.upper() == 'CANCELLED':
+            upper_states.append('CANCELLED')
+        if state.upper() == 'R' or state.upper() == 'RUNNING':
+            upper_states.append('RUNNING')
+        if state.upper() == 'F' or state.upper() == 'FAILED':
+            upper_states.append('FAILED')
+        if state.upper() == 'CD' or state.upper() == 'COMPLETED':
+            upper_states.append('COMPLETED')
+    return upper_states
 
 
 def print_job_info(job_info):
@@ -296,6 +322,9 @@ def print_job_info(job_info):
         else:
             display_exit_code = '1:0'
             display_job_state = 'FAILED'
+    specified_job_states = convert_specified_states()
+    if len(specified_job_states) > 0 and display_job_state not in specified_job_states:
+        return
     if is_brief:
         print(DISPLAY_SHORT_FORMAT.format(display_job_id,
                                           display_job_state,
@@ -378,7 +407,7 @@ def check_donau_cli_env():
         print('cli env home is not configured, '
               'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
         sys.exit(1)
-    if ca_cert_perm is not None:
+    if ca_cert_perm is None:
         print('cli ca_cert_perm is not specified,'
               'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
         sys.exit(1)

@@ -243,7 +243,7 @@ def check_donau_cli_env():
         print('cli env home is not configured, '
               'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
         sys.exit(1)
-    if ca_cert_perm is not None:
+    if ca_cert_perm is None:
         print('cli ca_cert_perm is not specified,'
               'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
         sys.exit(1)
