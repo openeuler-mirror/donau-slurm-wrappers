@@ -16,6 +16,7 @@ log_file = ""
 donau_command = ""
 option_dic = {}
 
+
 def split_num_letters(astr):
     nums, letters = "", ""
     for i in astr:
@@ -129,6 +130,7 @@ def convert_day(begin_time):
         time_form = time.strptime(begin_time, '%Y-%m-%d')
     return time.strftime('%Y/%m/%d %H:%M:%S', time_form)
 
+    
 #check whether the begintime variable format is legal
 def begintime_is_match(begintime):
     is_begintime = False
@@ -174,6 +176,7 @@ def begintime_is_match(begintime):
             is_begintime = True
     return is_begintime
 
+    
 #begintime parameter format is uniformly converted to yyyy/MM/dd HH24:mm:ss format
 def time_format(input_time):
     try:
@@ -280,6 +283,7 @@ def time_format(input_time):
         sys.exit()
     return datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
 
+    
 #check the format of the depdency parameter
 def match_dependency(condition):
     is_dependency = False
@@ -563,9 +567,9 @@ Try 'sbatch --help' for more info''')
                 sys.exit()
         elif opt_name == 'SBATCH_JOB_NAME':
             if not opt_value or opt_value.endswith('.sh'):
-                print('''sbatch: option "--job_name" requires an argument
+                print('''sbatch: option "--job-name" requires an argument
 Try 'sbatch --help' for more info''')
-                log('''sbatch: option "--job_name" requires an argument
+                log('''sbatch: option "--job-name" requires an argument
 Try 'sbatch --help' for more info''')
                 sys.exit()
         elif opt_name == 'MPI':
@@ -632,8 +636,8 @@ Try 'sbatch --help' for more info''')
                 sys.exit()
         elif opt_name == 'SBATCH_NODES':
             if not opt_value.isdigit():
-                print('sbatch: error: Invalid numeric value "' + opt_value + '" for --nodes.')
-                log('sbatch: error: Invalid numeric value "' + opt_value + '" for --nodes.')
+                print('sbatch: error: "'+ opt_value+'" is not a valid node count')
+                log('sbatch: error: "'+ opt_value+'" is not a valid node count')
                 sys.exit()
         elif opt_name == 'SBATCH_NTASKS_PER_NODE':
             if not opt_value.isdigit():
@@ -682,8 +686,6 @@ def init_config_with_env():
         option_dic["SBATCH_PARTITION"] = os.environ.get("SBATCH_PARTITION")
     if os.environ.get("SBATCH_TIMELIMIT") is not None:
         option_dic["SBATCH_TIMELIMIT"] = os.environ.get("SBATCH_TIMELIMIT")
-    if os.environ.get("SBATCH_EXCLUSIVE") is not None:
-        option_dic["SBATCH_EXCLUSIVE"] = os.environ.get("SBATCH_EXCLUSIVE")
     if os.environ.get("SBATCH_GPUS_PER_TASK") is not None:
         option_dic["SBATCH_GPUS_PER_TASK"] = os.environ.get("SBATCH_GPUS_PER_TASK")
 
@@ -711,49 +713,50 @@ def check_donau_cli_env():
 def get_help_info():
     help_info = '''Usage: sbatch [OPTIONS(0)...] [ : [OPTIONS(N)...]] script(0) [args(0)...]
 
-        Parallel run options:
-         -b, --begin=time                   defer job until HH:MM MM/DD/YY
-         -c, --cpus-per-task=ncpus          number of cpus required per task
-             --comment=name                 arbitrary comment
-         -d, --dependency=type:jobid        defer job until condition on jobid is satisfied
-         -D, --chdir=directory              set working directory for batch script
-         -e, --error=err                    file for batch script's standard error
-             --export[=names]               specify environment variables to export
-             --gid=group_id                 group ID to run job as (user root only)
-         -J, --job-name=jobname             name of job
-             --mpi=mpi_type                 type of mpi job
-         -n, --ntasks=ntasks                number of tasks to run
-             --ntasks-per-node=n            number of tasks to invoke on each node
-         -N, --nodes=N                      number of nodes on which to run (N = min[-max])
-         -o, --output=out                   file for batch script's standard output
-             --open-mode={append|truncate}  mode of open the output and error files
-         -p, --partition=partition          partition requested
-             --priority=value               set the priority of the job to value
-         -t, --time=minutes                 time limit
-        Constraint options:
-         -w, --nodelist=hosts...             request a specific list of hosts
-         -x, --exclude=hosts...              exclude a specific list of hosts
-        Consumable resources related options:
-         --exclusive                        allocate nodes in exclusive mode when
-                                            cpu consumable resource is enabled
-        GPU scheduling options:
-         --gpus-per-task=n                  number of GPUs required per spawned task
-        Help options:
-         --help                             show this help message
-         --usage                            display brief usage message'''
+Parallel run options:
+ -b, --begin=time                   defer job until HH:MM MM/DD/YY
+ -c, --cpus-per-task=ncpus          number of cpus required per task
+     --comment=name                 arbitrary comment
+ -d, --dependency=type:jobid        defer job until condition on jobid is satisfied
+ -D, --chdir=directory              set working directory for batch script
+ -e, --error=err                    file for batch script's standard error
+     --export[=names]               specify environment variables to export
+     --gid=group_id                 group ID to run job as (user root only)
+ -J, --job-name=jobname             name of job
+     --mpi=mpi_type                 type of mpi job
+ -n, --ntasks=ntasks                number of tasks to run
+     --ntasks-per-node=n            number of tasks to invoke on each node
+ -N, --nodes=N                      number of nodes on which to run (N = min[-max])
+ -o, --output=out                   file for batch script's standard output
+     --open-mode={append|truncate}  mode of open the output and error files
+ -p, --partition=partition          partition requested
+     --priority=value               set the priority of the job to value
+ -t, --time=minutes                 time limit
+Constraint options:
+ -w, --nodelist=hosts...            request a specific list of hosts
+ -x, --exclude=hosts...             exclude a specific list of hosts
+Consumable resources related options:
+ --exclusive                        allocate nodes in exclusive mode when
+                                    cpu consumable resource is enabled
+GPU scheduling options:
+ --gpus-per-task=n                  number of GPUs required per spawned task
+Help options:
+ --help                             show this help message
+ --usage                            display brief usage message'''
     return help_info
 
 
 def get_usage_info():
     usage_info = '''Usage: sbatch [-N nnodes] [-n ntasks] 
-                [-c ncpus] [-p partition] [-t minutes]
-                [-D path] [--mpi mpi_type] [--output file]
-                [--open-mode={append|truncate}] [--error file] 
-                [--chdir=directory] [-J jobname] [--gid=group] 
-                [--dependency=type:jobid] [--comment=name] 
-                [--ntasks-per-node=n] [--nodelist=hosts]
-                [--exclude=hosts][--export[=names]] [--gpus-per-task=n]
-                executable [args...]'''
+              [-c ncpus] [-p partition] [-t minutes]
+              [-D path] [--mpi mpi_type] [--output file]
+              [--open-mode={append|truncate}] [--error file] 
+              [--chdir=directory] [-J jobname] [--gid=group] 
+              [--dependency=type:jobid] [--comment=name] 
+              [--ntasks-per-node=n] [--nodelist=hosts]
+              [--exclude=hosts] [--export[=names]] 
+              [--exclusive] [--gpus-per-task=n]
+              executable [args...]'''
     return usage_info
 
 
@@ -928,7 +931,7 @@ if __name__ == '__main__':
                         donau_command += '!' + item + ' '
                 donau_command += "' "
         if "SBATCH_NODES" in option_dic:
-            donau_command += '-nnodes ' + option_dic["SBATCH_NODES"]
+            donau_command += '-nn ' + option_dic["SBATCH_NODES"]
             donau_command += ' '
         if "SBATCH_NTASKS_PER_NODE" in option_dic:
             donau_command += '-tpn ' + option_dic["SBATCH_NTASKS_PER_NODE"]

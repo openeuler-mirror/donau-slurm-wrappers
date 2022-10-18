@@ -18,6 +18,7 @@ process = False
 donau_command = ""
 option_dic = {}
 
+
 def split_num_letters(astr):
     nums, letters = "", ""
     for i in astr:
@@ -127,6 +128,7 @@ def convert_day(begin_time):
         time_form = time.strptime(begin_time, '%Y-%m-%d')
     return time.strftime('%Y/%m/%d %H:%M:%S', time_form)
 
+    
 #check whether the begintime variable format is legal
 def begintime_is_match(begintime):
     is_begintime = False
@@ -181,6 +183,7 @@ def begintime_is_match(begintime):
             is_begintime = True
     return is_begintime
 
+    
 #begintime parameter format is uniformly converted to yyyy/MM/dd HH24:mm:ss format
 def time_format(input_time):
     try:
@@ -287,6 +290,7 @@ def time_format(input_time):
         sys.exit()
     return datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
 
+    
 #check the format of the depdency parameter
 def match_dependency(condition):
     is_dependency = False
@@ -457,7 +461,7 @@ Try 'srun --help' for more info'''
                 print('srun: error: Invalid --time specification')
                 log('srun: error: Invalid --time specification')
                 sys.exit()
-        elif opt_name == 'SRUN_EXCLUSIVE':
+        elif opt_name == 'SLURM_EXCLUSIVE':
             pass
         elif opt_name == 'SRUN_GPUS_PER_TASK':
             if not opt_value.isdigit():
@@ -586,8 +590,6 @@ def init_config_with_env():
         option_dic["SLURM_PROLOG"] = os.environ.get("SLURM_PROLOG")
     if os.environ.get("SLURM_TIMELIMIT") is not None:
         option_dic["SLURM_TIMELIMIT"] = os.environ.get("SLURM_TIMELIMIT")
-    if os.environ.get("SLURM_EXCLUSIVE") is not None:
-        option_dic["SLURM_EXCLUSIVE"] = os.environ.get("SLURM_EXCLUSIVE")
     if os.environ.get("SLURM_GPUS_PER_TASK") is not None:
         option_dic["SLURM_GPUS_PER_TASK"] = os.environ.get("SLURM_GPUS_PER_TASK")
 
@@ -662,10 +664,11 @@ def get_usage_info():
             [--dependency=type:jobid][--comment=name]
             [--nodelist=hosts][--exclude=hosts]
             [--prolog=fname] [--epilog=fname]
-            [--gpus-per-task=n]
+            [--exclusive] [--gpus-per-task=n]
             executable [args...]'''
     return usage_info
 
+    
 if __name__ == '__main__':
     if os.getuid() == 0:
         print('Permission denied. The root user is not allowed to operate.')
@@ -786,10 +789,13 @@ if __name__ == '__main__':
                 donau_command += " " + item
             print(donau_command)
             log(donau_command)
-            process = subprocess.Popen(donau_command, shell=True, stdout=subprocess.PIPE, bufsize=1)
-            for item in iter(process.stdout.readline, b''):
-                print(item.decode().replace('\n', ''))
-                log(item.decode().replace('\n', ''))
+            if blocked:
+                process = subprocess.Popen(donau_command, shell=True, stdout=subprocess.PIPE, bufsize=1)
+                for item in iter(process.stdout.readline, b''):
+                    print(item.decode().replace('\n', ''))
+                    log(item.decode().replace('\n', ''))
+            else:
+                os.system(donau_command)
     except getopt.GetoptError as err:
         invalid_option = get_invalid_option(str(err))
         print_invalid_info(invalid_option)
