@@ -117,7 +117,23 @@ def get_invalid_option(err_message):
         options = re.findall(r'option (.*) not recognized', err_message)
         if len(options) == 1:
             return options[0]
+    if 'requires argument' in err_message:
+        options = re.findall(r'option (.*) requires argument', err_message)
+        if len(options) == 1:
+            print_single_option(options[0])
+            sys.exit(1)
     return ''
+
+
+def print_single_option(option):
+    if len(option) < 2:
+        return
+    if option.startswith('--'):
+        print("sacct: option '%s' requires an argument" % option)
+        return
+    if option[0] == '-':
+        print("sacct: option requires an argument -- '%s'" % option[1:])
+        return
 
 
 def print_invalid_option(option):
@@ -206,16 +222,31 @@ def check_result_error(out_line):
         err_list = out_line.split()
         job_err_info.append(' '.join(err_list[1:]))
         return False
-    if out_line.startswith('---'):
-        return False
-    if 'not exist' in out_line:
+    if 'only permitted' in out_line:
         err_list = out_line.split()
         job_err_info.append(' '.join(err_list[1:]))
+        return False
+    if 'the permission' in out_line:
+        err_list = out_line.split()
+        job_err_info.append(' '.join(err_list[1:]))
+        return False
+    if out_line.startswith('---'):
+        return False
+    if 'not exist' in out_line and 'token expired' not in out_line:
         return False
     out_job_info = out_line.split()
     if len(out_job_info) > 0 and out_job_info[0].isdigit():
         return True
+    job_err_info.append(out_line)
     return False
+
+
+def check_user(user_name):
+    try:
+         pwd.getpwnam(user_name)
+    except KeyError:
+        return False
+    return True
 
 
 def get_job_dict():
@@ -231,10 +262,14 @@ def get_job_dict():
             query_command += ' -u all '
     else:
         log('current user is not administrator')
+        valid_users = []
         for user_name in job_users:
-            if user_name != pwd.getpwuid(os.getuid())[0]:
-                print('sacct: error: Query job error on user %s: Access/permission denied' % user_name)
+            if not check_user(user_name):
+                print('sacct: error: Invalid user id: %s' % user_name)
                 sys.exit(1)
+            valid_users.append(user_name)
+        if len(valid_users) > 0:
+            query_command += ' -u ' + '\'' + ' '.join(valid_users) + '\''
     # filter job state
     donau_job_states = convert_donau_job_states(job_states)
     if len(donau_job_states) == 0:
@@ -249,8 +284,12 @@ def get_job_dict():
     if len(job_end_time) > 0:
         query_command += ' -et ' + '\'' + job_end_time + '\''
     # specify job IDs
-    if len(job_ids) > 0:
-        query_command += ' ' + ' '.join(job_ids)
+    for job_id in job_ids:
+        if not job_id.isdigit():
+            print('sacct: fatal: Bad job/step specified: %s' % job_id)
+            sys.exit(1)
+        else:
+            query_command += ' ' + job_id
     log('query command: %s' % query_command)
 
     job_dict = {}
@@ -383,7 +422,7 @@ def print_query_job_info(info_dict):
             info[DISPLAY_ERR_CODE] = 9
             continue
         if info.get(DISPLAY_STATE) is not None and info.get(DISPLAY_STATE) == 'FAILED':
-            exit_message = query_info[JOB_CUSTOM_EXIT_MESSAGE]
+            exit_message = ' '.join(query_info[JOB_CUSTOM_EXIT_MESSAGE:])
             if exit_message is not None:
                 err_code = parse_err_code(exit_message)
                 if info.get(DISPLAY_ERR_CODE) is not None and info.get(DISPLAY_ERR_CODE) == 0:

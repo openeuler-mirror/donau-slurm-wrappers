@@ -63,11 +63,29 @@ def init_log_file_name():
     log_file = os.path.join('/tmp/', file_name)
 
 
+def print_single_option(option):
+    if len(option) < 2:
+        return
+    if option.startswith('--'):
+        print("scancel: option '%s' requires an argument" % option)
+        print('Try "scancel --help" for more informatio')
+        return
+    if option[0] == '-':
+        print("scancel: option requires an argument -- '%s'" % option[1:])
+        print('Try "scancel --help" for more informatio')
+        return
+
+
 def get_invalid_option(err_message):
     if 'not recognized' in err_message:
         options = re.findall(r'option (.*) not recognized', err_message)
         if len(options) == 1:
             return options[0]
+    if 'requires argument' in err_message:
+        options = re.findall(r'option (.*) requires argument', err_message)
+        if len(options) == 1:
+            print_single_option(options[0])
+            sys.exit(1)
     return ''
 
 
@@ -159,9 +177,9 @@ def check_result_error(out_line):
             print('scancel: error: Kill job error: %s' % ' '.join(err_info[1:]))
         return False
     if 'not exist' in out_line:
-        err_info = out_line.split()
-        if len(err_info) > 1:
-            print('scancel: error: Kill job error: %s' % ' '.join(err_info[1:]))
+        # err_info = out_line.split()
+        # if len(err_info) > 1:
+        #     print('scancel: error: Kill job error: %s' % ' '.join(err_info[1:]))
         return False
     if out_line.startswith('--'):
         return False
@@ -333,12 +351,13 @@ if __name__ == '__main__':
                 for id in job_id_list:
                     log('get job id from command: %s' % id)
                     if not id.isdigit():
-                        print('scancel: error: Invalid job id %s' % id)
+                        print('scancel: error: Invalid job id %s specified' % id)
                     job_ids.append(id)
     except getopt.GetoptError as err:
         invalid_option = get_invalid_option(str(err))
         if len(invalid_option) != 0:
             print_invalid_option(invalid_option)
+            sys.exit(1)
         else:
             print(str(err))
 
