@@ -10,6 +10,12 @@ import subprocess
 from dateutil.relativedelta import relativedelta
 
 
+#global variable definition
+is_debug = False
+log_file = ""
+donau_command = ""
+option_dic = {}
+
 def split_num_letters(astr):
     nums, letters = "", ""
     for i in astr:
@@ -59,32 +65,15 @@ def converthh_mm_ss(hh_mm_ss):
 
 
 def time_is_match(time_out):
-    is_match = True
-    if '-' in time_out and ':' in time_out:
-        if time_out.count('-') > 1 or time_out.count(':') > 2:
-            is_match = False
-        time_out_be, time_out_af = time_out.strip().split('-')
-        if not time_out_be.isdigit():
-            is_match = False
-        for item in time_out_af.strip().split(':'):
-            if not item.isdigit():
-                is_match = False
-    elif '-' in time_out:
-        for item in time_out.strip().split('-'):
-            if not item.isdigit():
-                is_match = False
-    elif ':' in time_out:
-        for item in time_out.strip().split(':'):
-            if not item.isdigit():
-                is_match = False
-    else:
-        if not time_out.isdigit():
-            is_match = False
+    is_match=False
+    pattern1 = re.compile("(\d+-){0,1}(\d+:){0,2}(\d+){0,1}").match(time_out)
+    if pattern1 is not None and pattern1.group(0) == time_out:
+        is_match = True
     return is_match
 
 
 def convert_timeout(time_out):
-    timeout_converted = '"'
+    timeout_converted = ''
     if '-' in time_out and ':' in time_out:
         time_out_be, time_out_af = time_out.strip().split('-')
         if time_out_af.count(':') == 2:
@@ -126,7 +115,6 @@ def convert_timeout(time_out):
             timeout_converted += str(hours) + 'h' + str(minutes) + 'm'
         else:
             timeout_converted += time_out + 'm'
-    timeout_converted += '"'
     return timeout_converted
 
 
@@ -141,7 +129,7 @@ def convert_day(begin_time):
         time_form = time.strptime(begin_time, '%Y-%m-%d')
     return time.strftime('%Y/%m/%d %H:%M:%S', time_form)
 
-
+#check whether the begintime variable format is legal
 def begintime_is_match(begintime):
     is_begintime = False
     if begintime in ('today', 'tomorrow', 'now'):
@@ -186,7 +174,7 @@ def begintime_is_match(begintime):
             is_begintime = True
     return is_begintime
 
-
+#begintime parameter format is uniformly converted to yyyy/MM/dd HH24:mm:ss format
 def time_format(input_time):
     try:
         if "AM" in input_time or "PM" in input_time:
@@ -237,10 +225,8 @@ def time_format(input_time):
                         input_time = input_time[:index - 2] + ' ' + input_time[index - 2:]
             elif index - 2 > 0:
                 input_time = input_time[:index - 2] + ' ' + input_time[index - 2:]
-        if input_time == "today":
-            return (datetime.datetime.now() + relativedelta(seconds=1)).strftime('%Y/%m/%d %H:%M:%S')
-        elif input_time == "now":
-            return datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
+        if input_time == "today" or input_time == "now":
+            return (datetime.datetime.now() + relativedelta(seconds=2)).strftime('%Y/%m/%d %H:%M:%S')
         elif input_time == "tomorrow":
             return (datetime.datetime.now() + relativedelta(days=1)).strftime('%Y/%m/%d %H:%M:%S')
         elif "now" in input_time and input_time.startswith("now+") and len(input_time) > 4:
@@ -249,7 +235,7 @@ def time_format(input_time):
             return convert_day(input_time)
         elif input_time.strip().count(' ') == 0 and input_time.count(':') > 0 \
                 and '-' not in input_time and '/' not in input_time:
-            return convertHH_MM_SS(input_time)
+            return converthh_mm_ss(input_time)
         elif input_time.strip().count(' ') > 0:
             before, after = input_time.strip().split()
             if ':' in after:
@@ -294,7 +280,7 @@ def time_format(input_time):
         sys.exit()
     return datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
 
-
+#check the format of the depdency parameter
 def match_dependency(condition):
     is_dependency = False
     if condition.count(':') == 1:
@@ -340,7 +326,8 @@ def print_invalid_info(option):
     log('Try "sbatch --help" for more information')
 
 
-def update_dict(opts, option_dic):
+def update_dict(opts):
+    global option_dic
     for opt_name, opt_value in opts:
         if opt_name == '--help':
             option_dic["HELP"] = opt_value
@@ -392,10 +379,12 @@ def update_dict(opts, option_dic):
             option_dic["SBATCH_NTASKS_PER_NODE"] = opt_value
 
 
-def handle_script_file(file_name, option_dic, short_options, long_options):
+def handle_script_file(file_name, short_options, long_options):
+    global option_dic
     if file_name == []:
         return
     else:
+        #check if it is a script file
         if not str(file_name[0]).endswith(".sh"):
             if os.path.exists(file_name[0]):
                 error_info = '''sbatch: error: This does not look like a batch script.  
@@ -424,19 +413,23 @@ sbatch: error: For instance: #!/bin/sh'''
                     sys.exit()
                 mpirun_num = 0
                 for j in range(first_line + 1, len(lines)):
+                    #srun is not supported in scripts
                     if 'srun' in lines[j].strip().split():
                         print('sbatch: error: Not support srun command, replace it with normal command.')
                         log('sbatch: error: Not support srun command, replace it with normal command.')
                         sys.exit()
+                    #Multiple mpirun commands are not supported in scripts
                     if 'mpirun' in lines[j].strip().split():
                         mpirun_num += 1
                         if mpirun_num > 1:
                             print('sbatch: error: Not support multiple mpirun.')
                             log('sbatch: error: Not support multiple mpirun.')
                             sys.exit()
+                    #'#'and 'SBATCH' cannot be preceded by blank characters
                     if lines[j].strip().startswith('#SBATCH') and len(lines[j].strip()) > 8:
                         options, cmd = getopt.getopt(lines[j].strip()[8:].split(), short_options, long_options)
-                        update_dict(options, option_dic)
+                        #handle_parameter_exception(opts)
+                        update_dict(options)
 
         except IOError:
             print("sbatch: error: File is not found")
@@ -444,7 +437,8 @@ sbatch: error: For instance: #!/bin/sh'''
             exit()
 
 
-def handle_mpirun_task(file_name, option_dic):
+def handle_mpirun_task(file_name):
+    global option_dic
     if file_name == []:
         return
     else:
@@ -475,6 +469,8 @@ sbatch: error: For instance: #!/bin/sh'''
                     log(error_info)
                     sys.exit()
                 for j in range(first_line + 1, len(lines)):
+                    #mpi job only supports cosched job types
+                    #the parameters of '$CCS_MPI_OPTIONS' and 'MPI' need to be added
                     if 'mpirun' in lines[j].strip().split():
                         if '$CCS_MPI_OPTIONS' not in lines[j].strip().split() and "MPI" not in option_dic:
                             error_info = '''sbatch: error: Need to add mpi option $CCS_MPI_OPTIONS in front of the user_command
@@ -500,9 +496,10 @@ sbatch: error: example: mpirun [other_mpi_options] $CCS_MPI_OPTIONS <user_cmd>''
             exit()
 
 
-def handle_parameter_exception(opts):
-    for opt_name, opt_value in opts:
-        if opt_name == '-b' or opt_name == '--begin':
+def handle_parameter_exception():
+    global option_dic
+    for opt_name, opt_value in option_dic.items():
+        if opt_name == 'BEGIN':
             if not opt_value or opt_value.endswith('.sh'):
                 error_info = '''sbatch: option "--begin" requires an argument
 Try 'sbatch --help' for more info'''
@@ -515,19 +512,19 @@ Try 'sbatch --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
-        elif opt_name == '-c' or opt_name == '--cpus-per-task':
+        elif opt_name == 'SBATCH_CPUS_PER_TASK':
             if not opt_value.isdigit():
                 print('sbatch: error: Invalid numeric value "' + opt_value + '" for --cpus-per-task.')
                 log('sbatch: error: Invalid numeric value "' + opt_value + '" for --cpus-per-task.')
                 sys.exit()
-        elif opt_name == '--comment':
+        elif opt_name == 'COMMENT':
             if not opt_value or opt_value.endswith('.sh'):
                 error_info = '''sbatch: option "--comment" requires an argument
 Try 'sbatch --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
-        elif opt_name == '-d' or opt_name == '--dependency':
+        elif opt_name == 'SLURM_DEPENDENCY':
             if not opt_value or opt_value.endswith('.sh'):
                 error_info = '''sbatch: option "--dependency" requires an argument
 Try 'sbatch --help' for more info'''
@@ -538,107 +535,107 @@ Try 'sbatch --help' for more info'''
                 print('sbatch: error: Batch job submission failed: Job dependency problem')
                 log('sbatch: error: Batch job submission failed: Job dependency problem')
                 sys.exit()
-        elif opt_name == '-D' or opt_name == '--chdir':
+        elif opt_name == 'SLURM_WORKING_DIR':
             if not opt_value or opt_value.endswith('.sh'):
                 error_info = '''sbatch: option "--chdir" requires an argument
 Try 'sbatch --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
-        elif opt_name == '--export':
+        elif opt_name == 'SBATCH_EXPORT':
             if not opt_value or opt_value.endswith('.sh'):
                 error_info = '''sbatch: option "--export" requires an argument
 Try 'sbatch --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
-        elif opt_name == '-e' or opt_name == '--error':
+        elif opt_name == 'SBATCH_ERROR':
             if not opt_value or opt_value.endswith('.sh'):
                 print('''sbatch: option "--error" requires an argument
 Try 'sbatch --help' for more info''')
                 log('''sbatch: option "--error" requires an argument
 Try 'sbatch --help' for more info''')
                 sys.exit()
-        elif opt_name == '--gid':
+        elif opt_name == 'GID':
             if not opt_value.isdigit():
                 print('sbatch: error: Invalid numeric value "' + opt_value + '" for --gid.')
                 log('sbatch: error: Invalid numeric value "' + opt_value + '" for --gid.')
                 sys.exit()
-        elif opt_name == '-J' or opt_name == '--job_name':
+        elif opt_name == 'SBATCH_JOB_NAME':
             if not opt_value or opt_value.endswith('.sh'):
                 print('''sbatch: option "--job_name" requires an argument
 Try 'sbatch --help' for more info''')
                 log('''sbatch: option "--job_name" requires an argument
 Try 'sbatch --help' for more info''')
                 sys.exit()
-        elif opt_name == '--mpi':
+        elif opt_name == 'MPI':
             if opt_value not in ['hmpi', 'openmpi', 'intelmpi', 'mpich']:
                 print('sbatch:error: illegal cosched job type format, supported: hmpi, openmpi, intelmpi, mpich')
                 log('sbatch:error: illegal cosched job type format, supported: hmpi, openmpi, intelmpi, mpich')
                 sys.exit()
-        elif opt_name == '-n' or opt_name == '--ntasks':
+        elif opt_name == 'SLURM_NTASKS':
             if not opt_value.isdigit():
                 print('sbatch: error: Invalid numeric value "' + opt_value + '" for --ntasks.')
                 log('sbatch: error: Invalid numeric value "' + opt_value + '" for --ntasks.')
                 sys.exit()
-        elif opt_name == '-o' or opt_name == '--output':
+        elif opt_name == 'SBATCH_OUTPUT':
             if not opt_value or opt_value.endswith('.sh'):
                 print('''sbatch: option "--output" requires an argument
 Try 'sbatch --help' for more info''')
                 log('''sbatch: option "--output" requires an argument
 Try 'sbatch --help' for more info''')
                 sys.exit()
-        elif opt_name == '--open-mode':
+        elif opt_name == 'SBATCH_OPEN_MODE':
             if not opt_value or opt_value.endswith('.sh'):
                 print('''sbatch: option "--open-mode" requires an argument
 Try 'sbatch --help' for more info''')
                 log('''sbatch: option "--open-mode" requires an argument
 Try 'sbatch --help' for more info''')
                 sys.exit()
-        elif opt_name == '-p' or opt_name == '--partition':
+        elif opt_name == 'SBATCH_PARTITION':
             if not opt_value or opt_value.endswith('.sh'):
                 print('''sbatch: option "--partition" requires an argument
 Try 'sbatch --help' for more info''')
                 log('''sbatch: option "--partition" requires an argument
 Try 'sbatch --help' for more info''')
                 sys.exit()
-        elif opt_name == '--priority':
+        elif opt_name == 'PRIORITY':
             if not opt_value.isdigit() or int(opt_value) < 1 or int(opt_value) > 9999:
                 print('sbatch: error: Invalid numeric value "' + opt_value + '" for --priority.')
                 log('sbatch: error: Invalid numeric value "' + opt_value + '" for --priority.')
                 sys.exit()
-        elif opt_name == '-t' or opt_name == '--time':
+        elif opt_name == 'SBATCH_TIMELIMIT':
             if not time_is_match(opt_value):
                 print('sbatch: error: Invalid --time specification')
                 log('sbatch: error: Invalid --time specification')
                 sys.exit()
-        elif opt_name == '--exclusive':
+        elif opt_name == 'SBATCH_EXCLUSIVE':
             pass
-        elif opt_name == '--gpus-per-task':
+        elif opt_name == 'SBATCH_GPUS_PER_TASK':
             if not opt_value.isdigit():
                 print('sbatch: error: Invalid numeric value "' + opt_value + '" for --gpus-per-task.')
                 log('sbatch: error: Invalid numeric value "' + opt_value + '" for --gpus-per-task.')
                 sys.exit()
-        elif opt_name == '-w' or opt_name == '--nodelist':
+        elif opt_name == 'SBATCH_NODELIST':
             if not opt_value or opt_value.endswith('.sh'):
                 print('''sbatch: option "--nodelist" requires an argument
 Try 'sbatch --help' for more info''')
                 log('''sbatch: option "--nodelist" requires an argument
 Try 'sbatch --help' for more info''')
                 sys.exit()
-        elif opt_name == '-x' or opt_name == '--exclude':
+        elif opt_name == 'SBATCH_EXCLUDE':
             if not opt_value or opt_value.endswith('.sh'):
                 print('''sbatch: option "--exclude" requires an argument
 Try 'sbatch --help' for more info''')
                 log('''sbatch: option "--exclude" requires an argument
 Try 'sbatch --help' for more info''')
                 sys.exit()
-        elif opt_name == '-N' or opt_name == '--nodes':
+        elif opt_name == 'SBATCH_NODES':
             if not opt_value.isdigit():
                 print('sbatch: error: Invalid numeric value "' + opt_value + '" for --nodes.')
                 log('sbatch: error: Invalid numeric value "' + opt_value + '" for --nodes.')
                 sys.exit()
-        elif opt_name == '--ntasks-per-node':
+        elif opt_name == 'SBATCH_NTASKS_PER_NODE':
             if not opt_value.isdigit():
                 print('sbatch: error: Invalid numeric value "' + opt_value + '" for --ntasks-per-node.')
                 log('sbatch: error: Invalid numeric value "' + opt_value + '" for --ntasks-per-node.')
@@ -647,8 +644,8 @@ Try 'sbatch --help' for more info''')
 
 def log(content):
     global is_debug
+    global log_file
     if is_debug:
-        global log_file
         f = open(log_file, 'a+')
         f.write(content + '\n')
         f.close()
@@ -664,62 +661,13 @@ def init_log_file_name():
 # init options from environment
 def init_config_with_env():
     global is_debug
-    global log_file
+    global option_dic
     debug_env = os.getenv('SLURM_TO_DONAU_DEBUG')
     if debug_env is not None and debug_env.lower() == 'true':
         is_debug = True
         init_log_file_name()
     else:
         is_debug = False
-
-
-def main():
-    short_options = '-b:-c:-d:-D:-e:-J:-n:-o:-p:-t:-w:-x:-N:'
-    long_options = ['begin=', 'cpus-per-task=', 'comment=', 'dependency=', 'chdir=', 'export=',
-                    'error=', 'gid=', 'job-name=', 'mpi=', 'ntasks=', 'output=', 'open-mode=',
-                    'partition=', 'priority=', 'time=', 'exclusive', 'gpus-per-task=', 'nodelist=',
-                    'exclude=', 'nodes=', 'ntasks-per-node=', 'usage', 'help']
-    help_info = '''Usage: sbatch [OPTIONS(0)...] [ : [OPTIONS(N)...]] script(0) [args(0)...]
-
-    Parallel run options:
-     -b, --begin=time            defer job until HH:MM MM/DD/YY
-     -c, --cpus-per-task=ncpus   number of cpus required per task
-         --comment=name          arbitrary comment
-     -d, --dependency=type:jobid defer job until condition on jobid is satisfied
-     -D, --chdir=directory       set working directory for batch script
-     -e, --error=err             file for batch script's standard error
-         --export[=names]        specify environment variables to export
-         --gid=group_id          group ID to run job as (user root only)
-     -J, --job-name=jobname      name of job
-         --mpi=mpi_type          type of mpi job
-     -n, --ntasks=ntasks         number of tasks to run
-         --ntasks-per-node=n     number of tasks to invoke on each node
-     -N, --nodes=N               number of nodes on which to run (N = min[-max])
-     -o, --output=out            file for batch script's standard output
-     -p, --partition=partition   partition requested
-         --priority=value        set the priority of the job to value
-     -t, --time=minutes          time limit
-    Constraint options:
-    -w, --nodelist=hosts...     request a specific list of hosts
-    -x, --exclude=hosts...      exclude a specific list of hosts
-    Consumable resources related options:
-     --exclusive             allocate nodes in exclusive mode when
-                             cpu consumable resource is enabled
-    GPU scheduling options:
-     --gpus-per-task=n       number of GPUs required per spawned task
-    Help options:
-     -h, --help              show this help message
-     --usage                 display brief usage message'''
-    usage_info = '''Usage: sbatch [-N nnodes] [-n ntasks] 
-            [-c ncpus] [-p partition] [-t minutes]
-            [-D path] [--mpi mpi_type] [--output file] 
-            [--error file] [--chdir=directory] [-J jobname] 
-            [--gid=group] [--dependency=type:jobid] 
-            [--comment=name] [--ntasks-per-node=n] [--nodelist=hosts]
-            [--exclude=hosts][--export[=names]] [--gpus-per-task=n]
-            executable [args...]'''
-    donau_command = ""
-    option_dic = {}
     if os.environ.get("SBATCH_EXPORT") is not None:
         option_dic["SBATCH_EXPORT"] = os.environ.get("SBATCH_EXPORT")
     if os.environ.get("SBATCH_ERROR") is not None:
@@ -738,28 +686,109 @@ def main():
         option_dic["SBATCH_EXCLUSIVE"] = os.environ.get("SBATCH_EXCLUSIVE")
     if os.environ.get("SBATCH_GPUS_PER_TASK") is not None:
         option_dic["SBATCH_GPUS_PER_TASK"] = os.environ.get("SBATCH_GPUS_PER_TASK")
+
+
+def check_donau_cli_env():
+    sched_cli_home = os.getenv('CCSCHEDULER_CLI_HOME')
+    ccs_cli_home = os.getenv('CCS_CLI_HOME')
+    ca_cert_perm = os.getenv('CURL_CA_BUNDLE')
+    if sched_cli_home is None or ccs_cli_home is None or ca_cert_perm is None:
+        print('cli env home is not configured, '
+              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
+        sys.exit(1)
+    if ca_cert_perm is None:
+        print('cli ca_cert_perm is not specified,'
+              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
+        sys.exit(1)
+    global djob_path
+    djob_path = os.path.join(ccs_cli_home, 'bin', 'djob')
+    if not os.path.exists(djob_path):
+        print('djob path is not exist,'
+              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
+        sys.exit(1)
+
+
+def get_help_info():
+    help_info = '''Usage: sbatch [OPTIONS(0)...] [ : [OPTIONS(N)...]] script(0) [args(0)...]
+
+        Parallel run options:
+         -b, --begin=time                   defer job until HH:MM MM/DD/YY
+         -c, --cpus-per-task=ncpus          number of cpus required per task
+             --comment=name                 arbitrary comment
+         -d, --dependency=type:jobid        defer job until condition on jobid is satisfied
+         -D, --chdir=directory              set working directory for batch script
+         -e, --error=err                    file for batch script's standard error
+             --export[=names]               specify environment variables to export
+             --gid=group_id                 group ID to run job as (user root only)
+         -J, --job-name=jobname             name of job
+             --mpi=mpi_type                 type of mpi job
+         -n, --ntasks=ntasks                number of tasks to run
+             --ntasks-per-node=n            number of tasks to invoke on each node
+         -N, --nodes=N                      number of nodes on which to run (N = min[-max])
+         -o, --output=out                   file for batch script's standard output
+             --open-mode={append|truncate}  mode of open the output and error files
+         -p, --partition=partition          partition requested
+             --priority=value               set the priority of the job to value
+         -t, --time=minutes                 time limit
+        Constraint options:
+         -w, --nodelist=hosts...             request a specific list of hosts
+         -x, --exclude=hosts...              exclude a specific list of hosts
+        Consumable resources related options:
+         --exclusive                        allocate nodes in exclusive mode when
+                                            cpu consumable resource is enabled
+        GPU scheduling options:
+         --gpus-per-task=n                  number of GPUs required per spawned task
+        Help options:
+         --help                             show this help message
+         --usage                            display brief usage message'''
+    return help_info
+
+
+def get_usage_info():
+    usage_info = '''Usage: sbatch [-N nnodes] [-n ntasks] 
+                [-c ncpus] [-p partition] [-t minutes]
+                [-D path] [--mpi mpi_type] [--output file]
+                [--open-mode={append|truncate}] [--error file] 
+                [--chdir=directory] [-J jobname] [--gid=group] 
+                [--dependency=type:jobid] [--comment=name] 
+                [--ntasks-per-node=n] [--nodelist=hosts]
+                [--exclude=hosts][--export[=names]] [--gpus-per-task=n]
+                executable [args...]'''
+    return usage_info
+
+
+if __name__ == '__main__':
+    if os.getuid() == 0:
+        print('Permission denied. The root user is not allowed to operate.')
+        log('Permission denied. The root user is not allowed to operate.')
+        sys.exit(1)
+    check_donau_cli_env()
+    init_config_with_env()
+    short_options = '-b:-c:-d:-D:-e:-J:-n:-o:-p:-t:-w:-x:-N:'
+    long_options = ['begin=', 'cpus-per-task=', 'comment=', 'dependency=', 'chdir=', 'export=',
+                    'error=', 'gid=', 'job-name=', 'mpi=', 'ntasks=', 'output=', 'open-mode=',
+                    'partition=', 'priority=', 'time=', 'exclusive', 'gpus-per-task=', 'nodelist=',
+                    'exclude=', 'nodes=', 'ntasks-per-node=', 'usage', 'help']
     try:
         opts, args = getopt.getopt(sys.argv[1:], short_options, long_options)
-        handle_parameter_exception(opts)
-        handle_script_file(args, option_dic, short_options, long_options)
-        update_dict(opts, option_dic)
-        handle_mpirun_task(args, option_dic)
+        # options from script file have higher priority than environment
+        handle_script_file(args, short_options, long_options)
+        # options from command have higher priority than script file and environment
+        update_dict(opts)
         if "HELP" in option_dic:
-            print(help_info)
-            log(help_info)
+            print(get_help_info())
+            log(get_help_info())
             sys.exit()
         if "USAGE" in option_dic:
-            print(usage_info)
-            log(usage_info)
+            print(get_usage_info())
+            log(get_usage_info())
             sys.exit()
-        if sys.argv[0][:-3] == "sbatch":
-            donau_command += "dsub "
+        handle_parameter_exception()
+        handle_mpirun_task(args)
+        donau_command += "dsub "
         output_mode = False
         if "SBATCH_OPEN_MODE" in option_dic and option_dic["SBATCH_OPEN_MODE"] == 'append':
             output_mode = True
-        if "BEGIN" in option_dic:
-            donau_command += '-S "'
-            donau_command += time_format(option_dic["BEGIN"]) + '" '
         if "COMMENT" in option_dic:
             donau_command += '-d "' + option_dic["COMMENT"] + '" '
         if "SLURM_DEPENDENCY" in option_dic:
@@ -796,13 +825,13 @@ def main():
         if "PRIORITY" in option_dic:
             donau_command += '-p ' + option_dic["PRIORITY"] + ' '
         if "SBATCH_TIMELIMIT" in option_dic:
-            donau_command += '-T ' + convert_timeout(option_dic["SBATCH_TIMELIMIT"]) + ' '
+            donau_command += '-T "' + convert_timeout(option_dic["SBATCH_TIMELIMIT"]) + '" '
         if "SBATCH_EXCLUSIVE" in option_dic:
             donau_command += '-ex ' + 'job' + ' '
         if "SBATCH_CPUS_PER_TASK" in option_dic and "SBATCH_GPUS_PER_TASK" in option_dic:
             if not option_dic["SBATCH_CPUS_PER_TASK"].isdigit() and not option_dic["SBATCH_GPUS_PER_TASK"].isdigit():
                 error_info = 'sbatch: error: Invalid numeric value + "' + option_dic["SBATCH_CPUS_PER_TASK"] + '" for --cpus-per-task and \
-Invalid numeric value "' + option_dic["SBATCH_GPUS_PER_TASK"] + '" for --gpus-per-task.'
+    Invalid numeric value "' + option_dic["SBATCH_GPUS_PER_TASK"] + '" for --gpus-per-task.'
                 print(error_info)
                 log(error_info)
                 sys.exit()
@@ -846,7 +875,6 @@ Invalid numeric value "' + option_dic["SBATCH_GPUS_PER_TASK"] + '" for --gpus-pe
             m_exclude1 = pattern1.match(option_dic["SBATCH_EXCLUDE"])
             m_node2 = pattern2.match(option_dic["SBATCH_NODELIST"])
             m_exclude2 = pattern2.match(option_dic["SBATCH_EXCLUDE"])
-
             if m_node1 and m_node1.group(0) == option_dic["SBATCH_NODELIST"] and m_exclude1 and m_exclude1.group(0) == \
                     option_dic[
                         "SBATCH_EXCLUDE"]:
@@ -901,13 +929,16 @@ Invalid numeric value "' + option_dic["SBATCH_GPUS_PER_TASK"] + '" for --gpus-pe
                 donau_command += "' "
         if "SBATCH_NODES" in option_dic:
             donau_command += '-nnodes ' + option_dic["SBATCH_NODES"]
-            donau_command += '" '
+            donau_command += ' '
         if "SBATCH_NTASKS_PER_NODE" in option_dic:
             donau_command += '-tpn ' + option_dic["SBATCH_NTASKS_PER_NODE"]
             donau_command += ' '
+        if "BEGIN" in option_dic:
+            donau_command += '-S "'
+            donau_command += time_format(option_dic["BEGIN"]) + '" '
         if args == []:
             error_info = '''sbatch:fatal:No batch script to execute.
-Try "sbatch --help" for more information'''
+    Try "sbatch --help" for more information'''
             print(error_info)
             log(error_info)
             sys.exit()
@@ -948,13 +979,3 @@ Try "sbatch --help" for more information'''
     except:
         sys.exit()
 
-
-if __name__ == '__main__':
-    is_debug = False
-    log_file = ""
-    init_config_with_env()
-    if os.getuid() == 0:
-        print('Permission denied. The root user is not allowed to operate.')
-        log('Permission denied. The root user is not allowed to operate.')
-        sys.exit()
-    main()

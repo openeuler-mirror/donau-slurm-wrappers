@@ -9,6 +9,15 @@ import subprocess
 from dateutil.relativedelta import relativedelta
 
 
+#global variable definition
+is_debug = False
+log_file = ""
+blocked = True
+output_mode = False
+process = False
+donau_command = ""
+option_dic = {}
+
 def split_num_letters(astr):
     nums, letters = "", ""
     for i in astr:
@@ -41,57 +50,29 @@ def convert_now(begin_time):
     return time_converted
 
 
-def convert24(str12):
-    if str12[-2:] == "AM" and str12[:2] == "12":
-        return "00" + str12[2:-2]
-    elif str12[-2:] == "AM":
-        return str12[:-2]
-    elif str12[-2:] == "PM" and str12[:2] == "12":
-        return str12[:-2]
-    else:
-        return str(int(str12[:2]) + 12) + str12[2:-2]
-
-
-def convertHH_MM_SS(HH_MM_SS):
-    if HH_MM_SS.count(':') == 1:
-        HH_MM_SS += ':00'
+def converthh_mm_ss(hh_mm_ss):
+    if hh_mm_ss.count(':') == 1:
+        hh_mm_ss += ':00'
     time_day = time.strftime('%Y/%m/%d', time.localtime())
-    time_str = time_day + " " + HH_MM_SS
+    time_str = time_day + " " + hh_mm_ss
     time_form = time.strptime(time_str, '%Y/%m/%d %H:%M:%S')
     if int(time.mktime(time_form)) - int(time.mktime(datetime.datetime.now().timetuple())) < 0:
         time_tomorrow_r = datetime.datetime.now() + datetime.timedelta(days=1)
         time_tomorrow = time.strftime('%Y/%m/%d', time_tomorrow_r.timetuple())
-        time_str = time_tomorrow + " " + HH_MM_SS
+        time_str = time_tomorrow + " " + hh_mm_ss
     return time_str
 
 
 def time_is_match(time_out):
-    is_match = True
-    if '-' in time_out and ':' in time_out:
-        if time_out.count('-') > 1 or time_out.count(':') > 2:
-            is_match = False
-        time_out_be, time_out_af = time_out.strip().split('-')
-        if not time_out_be.isdigit():
-            is_match = False
-        for item in time_out_af.strip().split(':'):
-            if not item.isdigit():
-                is_match = False
-    elif '-' in time_out:
-        for item in time_out.strip().split('-'):
-            if not item.isdigit():
-                is_match = False
-    elif ':' in time_out:
-        for item in time_out.strip().split(':'):
-            if not item.isdigit():
-                is_match = False
-    else:
-        if not time_out.isdigit():
-            is_match = False
+    is_match=False
+    pattern1 = re.compile("(\d+-){0,1}(\d+:){0,2}(\d+){0,1}").match(time_out)
+    if pattern1 is not None and pattern1.group(0) == time_out:
+        is_match = True
     return is_match
 
 
 def convert_timeout(time_out):
-    timeout_converted = '"'
+    timeout_converted = ''
     if '-' in time_out and ':' in time_out:
         time_out_be, time_out_af = time_out.strip().split('-')
         if time_out_af.count(':') == 2:
@@ -132,7 +113,6 @@ def convert_timeout(time_out):
             timeout_converted += str(hours) + 'h' + str(minutes) + 'm'
         else:
             timeout_converted += time_out + 'm'
-    timeout_converted += '"'
     return timeout_converted
 
 
@@ -147,7 +127,7 @@ def convert_day(begin_time):
         time_form = time.strptime(begin_time, '%Y-%m-%d')
     return time.strftime('%Y/%m/%d %H:%M:%S', time_form)
 
-
+#check whether the begintime variable format is legal
 def begintime_is_match(begintime):
     is_begintime = False
     if begintime in ('today', 'tomorrow', 'now'):
@@ -201,7 +181,7 @@ def begintime_is_match(begintime):
             is_begintime = True
     return is_begintime
 
-
+#begintime parameter format is uniformly converted to yyyy/MM/dd HH24:mm:ss format
 def time_format(input_time):
     try:
         if "AM" in input_time or "PM" in input_time:
@@ -232,7 +212,6 @@ def time_format(input_time):
                                                                                                        index:]
         if "T" in input_time:
             input_time = input_time.replace('T', ' ')
-
         if input_time.strip().count(' ') == 0 and input_time.count(':') > 0 \
                 and ('-' in input_time or '/' in input_time):
             index = input_time.find(':')
@@ -253,10 +232,8 @@ def time_format(input_time):
                         input_time = input_time[:index - 2] + ' ' + input_time[index - 2:]
             elif index - 2 > 0:
                 input_time = input_time[:index - 2] + ' ' + input_time[index - 2:]
-        if input_time == "today":
+        if input_time == "today" or input_time == "now":
             return (datetime.datetime.now() + relativedelta(seconds=1)).strftime('%Y/%m/%d %H:%M:%S')
-        elif input_time == "now":
-            return datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
         elif input_time == "tomorrow":
             return (datetime.datetime.now() + relativedelta(days=1)).strftime('%Y/%m/%d %H:%M:%S')
         elif "now" in input_time and input_time.startswith("now+") and len(input_time) > 4:
@@ -265,7 +242,7 @@ def time_format(input_time):
             return convert_day(input_time)
         elif input_time.strip().count(' ') == 0 and input_time.count(':') > 0 \
                 and '-' not in input_time and '/' not in input_time:
-            return convertHH_MM_SS(input_time)
+            return converthh_mm_ss(input_time)
         elif input_time.strip().count(' ') > 0:
             before, after = input_time.strip().split()
             if ':' in after:
@@ -304,13 +281,13 @@ def time_format(input_time):
                 return time_str
     except:
         error_info = 'Invalid time specification:' + input_time + '\n' + \
-                     'sbatch: error: Invalid --begin specification'
+                     'srun: error: Invalid --begin specification'
         print(error_info)
         log(error_info)
         sys.exit()
     return datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
 
-
+#check the format of the depdency parameter
 def match_dependency(condition):
     is_dependency = False
     if condition.count(':') == 1:
@@ -356,155 +333,158 @@ def print_invalid_info(option):
     log('''Try "srun --help" for more information''')
 
 
-def handle_parameter_exception(opts):
-    for opt_name, opt_value in opts:
-        if opt_name == '-b' or opt_name == '--begin':
+def handle_parameter_exception():
+    global option_dic
+    for opt_name, opt_value in option_dic.items():
+        if opt_name == 'BEGIN':
             if not opt_value or opt_value.endswith('.sh'):
-                error_info = '''sbatch: option "--begin" requires an argument
-Try 'sbatch --help' for more info'''
+                error_info = '''srun: option "--begin" requires an argument
+Try 'srun --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
             if not begintime_is_match(opt_value):
                 error_info = 'Invalid time specification:' + opt_value + '\n' + \
-                             'sbatch: error: Invalid --begin specification'
+                             'srun: error: Invalid --begin specification'
                 print(error_info)
                 log(error_info)
                 sys.exit()
-        elif opt_name == '-c' or opt_name == '--cpus-per-task':
+        elif opt_name == 'SRUN_CPUS_PER_TASK':
             if not opt_value.isdigit():
-                print('sbatch: error: Invalid numeric value "' + opt_value + '" for --cpus-per-task.')
-                log('sbatch: error: Invalid numeric value "' + opt_value + '" for --cpus-per-task.')
+                print('srun: error: Invalid numeric value "' + opt_value + '" for --cpus-per-task.')
+                log('srun: error: Invalid numeric value "' + opt_value + '" for --cpus-per-task.')
                 sys.exit()
-        elif opt_name == '--comment':
+        elif opt_name == 'COMMENT':
             if not opt_value or opt_value.endswith('.sh'):
-                error_info = '''sbatch: option "--comment" requires an argument
-Try 'sbatch --help' for more info'''
+                error_info = '''srun: option "--comment" requires an argument
+Try 'srun --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
-        elif opt_name == '-d' or opt_name == '--dependency':
+        elif opt_name == 'SLURM_DEPENDENCY':
             if not opt_value or opt_value.endswith('.sh'):
-                error_info = '''sbatch: option "--dependency" requires an argument
-Try 'sbatch --help' for more info'''
+                error_info = '''srun: option "--dependency" requires an argument
+Try 'srun --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
             elif not match_dependency(opt_value):
-                print('sbatch: error: Batch job submission failed: Job dependency problem')
-                log('sbatch: error: Batch job submission failed: Job dependency problem')
+                print('srun: error: Batch job submission failed: Job dependency problem')
+                log('srun: error: Batch job submission failed: Job dependency problem')
                 sys.exit()
-        elif opt_name == '-D' or opt_name == '--chdir':
+        elif opt_name == 'SLURM_WORKING_DIR':
             if not opt_value or opt_value.endswith('.sh'):
-                error_info = '''sbatch: option "--chdir" requires an argument
- Try 'sbatch --help' for more info'''
+                error_info = '''srun: option "--chdir" requires an argument
+ Try 'srun --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
-        elif opt_name == '--export':
+        elif opt_name == 'SRUN_EXPORT':
             if not opt_value or opt_value.endswith('.sh'):
-                error_info = '''sbatch: option "--export" requires an argument
-Try 'sbatch --help' for more info'''
+                error_info = '''srun: option "--export" requires an argument
+Try 'srun --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
-        elif opt_name == '-e' or opt_name == '--error':
+        elif opt_name == 'SRUN_ERROR':
             if not opt_value or opt_value.endswith('.sh'):
-                error_info = '''sbatch: option "--error" requires an argument
-Try 'sbatch --help' for more info'''
+                error_info = '''srun: option "--error" requires an argument
+Try 'srun --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
-        elif opt_name == '--epilog':
+        elif opt_name == 'SLURM_EPILOG':
             if not opt_value or opt_value.endswith('.sh'):
-                error_info = '''sbatch: option "--epilog" requires an argument
- Try 'sbatch --help' for more info'''
+                error_info = '''srun: option "--epilog" requires an argument
+ Try 'srun --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
-        elif opt_name == '--gid':
+        elif opt_name == 'GID':
             if not opt_value.isdigit():
-                print('sbatch: error: Invalid numeric value "' + opt_value + '" for --gid.')
-                log('sbatch: error: Invalid numeric value "' + opt_value + '" for --gid.')
+                print('srun: error: Invalid numeric value "' + opt_value + '" for --gid.')
+                log('srun: error: Invalid numeric value "' + opt_value + '" for --gid.')
                 sys.exit()
-        elif opt_name == '-J' or opt_name == '--job_name':
+        elif opt_name == 'SRUN_JOB_NAME':
             if not opt_value or opt_value.endswith('.sh'):
-                error_info = '''sbatch: option "--job_name" requires an argument
-Try 'sbatch --help' for more info'''
+                error_info = '''srun: option "--job_name" requires an argument
+Try 'srun --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
-        elif opt_name == '-n' or opt_name == '--ntasks':
+        elif opt_name == 'SLURM_NTASKS':
             if not opt_value.isdigit():
-                print('sbatch: error: Invalid numeric value "' + opt_value + '" for --ntasks.')
-                log('sbatch: error: Invalid numeric value "' + opt_value + '" for --ntasks.')
+                print('srun: error: Invalid numeric value "' + opt_value + '" for --ntasks.')
+                log('srun: error: Invalid numeric value "' + opt_value + '" for --ntasks.')
                 sys.exit()
-        elif opt_name == '-o' or opt_name == '--output':
+        elif opt_name == 'SRUN_OUTPUT':
             if not opt_value or opt_value.endswith('.sh'):
-                error_info = '''sbatch: option "--output" requires an argument
-Try 'sbatch --help' for more info'''
+                error_info = '''srun: option "--output" requires an argument
+Try 'srun --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
-        elif opt_name == '--open-mode':
+        elif opt_name == 'SRUN_OPEN_MODE':
             if not opt_value or opt_value.endswith('.sh'):
-                error_info = '''sbatch: option "--open-mode" requires an argument
-Try 'sbatch --help' for more info'''
+                error_info = '''srun: option "--open-mode" requires an argument
+Try 'srun --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
-        elif opt_name == '-p' or opt_name == '--partition':
+        elif opt_name == 'SRUN_PARTITION':
             if not opt_value or opt_value.endswith('.sh'):
-                error_info = '''sbatch: option "--partition" requires an argument
-Try 'sbatch --help' for more info'''
+                error_info = '''srun: option "--partition" requires an argument
+Try 'srun --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
-        elif opt_name == '--priority':
+        elif opt_name == 'PRIORITY':
             if not opt_value.isdigit() or int(opt_value) < 1 or int(opt_value) > 9999:
-                print('sbatch: error: Invalid numeric value "' + opt_value + '" for --priority.')
-                log('sbatch: error: Invalid numeric value "' + opt_value + '" for --priority.')
+                print('srun: error: Invalid numeric value "' + opt_value + '" for --priority.')
+                log('srun: error: Invalid numeric value "' + opt_value + '" for --priority.')
                 sys.exit()
-        elif opt_name == '--prolog':
+        elif opt_name == 'SLURM_PROLOG':
             if not opt_value or opt_value.endswith('.sh'):
-                error_info = '''sbatch: option "--prolog" requires an argument
-Try 'sbatch --help' for more info'''
+                error_info = '''srun: option "--prolog" requires an argument
+Try 'srun --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
-        elif opt_name == '--pty':
+        elif opt_name == 'PTY':
             pass
-        elif opt_name == '-t' or opt_name == '--time':
+        elif opt_name == 'SRUN_TIMELIMIT':
             if not time_is_match(opt_value):
-                print('sbatch: error: Invalid --time specification')
-                log('sbatch: error: Invalid --time specification')
+                print('srun: error: Invalid --time specification')
+                log('srun: error: Invalid --time specification')
                 sys.exit()
-        elif opt_name == '--exclusive':
+        elif opt_name == 'SRUN_EXCLUSIVE':
             pass
-        elif opt_name == '--gpus-per-task':
+        elif opt_name == 'SRUN_GPUS_PER_TASK':
             if not opt_value.isdigit():
-                print('sbatch: error: Invalid numeric value "' + opt_value + '" for --gpus-per-task.')
-                log('sbatch: error: Invalid numeric value "' + opt_value + '" for --gpus-per-task.')
+                print('srun: error: Invalid numeric value "' + opt_value + '" for --gpus-per-task.')
+                log('srun: error: Invalid numeric value "' + opt_value + '" for --gpus-per-task.')
                 sys.exit()
-        elif opt_name == '-w' or opt_name == '--nodelist':
+        elif opt_name == 'SRUN_NODELIST':
+            print(opt_value)
             if not opt_value or opt_value.endswith('.sh'):
-                error_info = '''sbatch: option "--nodelist" requires an argument
-Try 'sbatch --help' for more info'''
+                error_info = '''srun: option "--nodelist" requires an argument
+Try 'srun --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
-        elif opt_name == '-x' or opt_name == '--exclude':
+        elif opt_name == 'SRUN_EXCLUDE':
             if not opt_value or opt_value.endswith('.sh'):
-                error_info = '''sbatch: option "--exclude" requires an argument
-Try 'sbatch --help' for more info'''
+                error_info = '''srun: option "--exclude" requires an argument
+Try 'srun --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
 
 
-def update_dict(opts, option_dic):
+def update_dict(opts):
+    global option_dic
     for opt_name, opt_value in opts:
-        if opt_name == '--help':
+        if opt_name == '-h' or opt_name == '--help':
             option_dic["HELP"] = opt_value
         if opt_name == '--usage':
             option_dic["USAGE"] = opt_value
@@ -565,7 +545,7 @@ def log(content):
 
 def init_log_file_name():
     global log_file
-    file_name = '%s.%d.%d' % ('sbatch', os.getuid(), os.getpid())
+    file_name = '%s.%d.%d' % ('srun', os.getuid(), os.getpid())
     log_file = os.path.join('/tmp/', file_name)
     print('log_file:' + str(log_file))
 
@@ -573,68 +553,13 @@ def init_log_file_name():
 # init options from environment
 def init_config_with_env():
     global is_debug
-    global log_file
-    debug_env = os.getenv('SLURM_TO_DONAU_DEBUG')
-    if debug_env is not None and debug_env.lower() == 'true':
+    global option_dic
+    if os.getenv('SLURM_TO_DONAU_DEBUG') is not None \
+            and os.getenv('SLURM_TO_DONAU_DEBUG').lower() == 'true':
         is_debug = True
         init_log_file_name()
     else:
         is_debug = False
-
-
-def main():
-    short_options = '-b:-c:-d:-D:-e:-J:-n:-o:-p:-t:'
-    long_options = ['begin=', 'cpus-per-task=', 'comment=', 'dependency=', 'chdir=', 'export=',
-                    'error=', 'gid=', 'epilog=', 'job-name=', 'ntasks=', 'output=', 'open-mode=', 'partition=',
-                    'priority=',
-                    'prolog=', 'pty', 'time=', 'exclusive', 'gpus-per-task=', 'usage', 'help']
-    help_info = '''Usage: srun [OPTIONS(0)... [executable(0) [args(0)...]]] [ : [OPTIONS(N)...]] executable(N) [args(N)...]
-    
-    Parallel run options:
-     -b, --begin=time            defer job until HH:MM MM/DD/YY
-     -c, --cpus-per-task=ncpus   number of cpus required per task
-         --comment=name          arbitrary comment
-     -d, --dependency=type:jobid defer job until condition on jobid is satisfied
-     -D, --chdir=path            change remote current working directory
-         --export=env_vars|NONE  environment variables passed to launcher with
-                                 optional values or NONE (pass no variables)
-     -e, --error=err             location of stderr redirection
-         --epilog=program        run "program" after launching job step
-         --gid=group_id          group ID to run job as (user root only)
-     -J, --job-name=jobname      name of job
-     -n, --ntasks=ntasks         number of tasks to run
-     -o, --output=out            location of stdout redirection
-     -p, --partition=partition   partition requested
-         --priority=value        set the priority of the job to value
-         --prolog=program        run "program" before launching job step
-         --pty                   run task zero in pseudo terminal
-     -t, --time=minutes          time limit
-    
-    Constraint options:
-    -w, --nodelist=hosts...     request a specific list of hosts
-    -x, --exclude=hosts...      exclude a specific list of hosts 
-    
-    Consumable resources related options:
-     --exclusive             for job allocation, this allocates nodes in
-                             in exclusive mode
-                             for job steps, this is equivalent to --exact
-                             
-    GPU scheduling options:
-     --gpus-per-task=n       number of GPUs required per spawned task
-     
-    Help options:
-     -h, --help              show this help message
-     --usage                 display brief usage message'''
-    usage_info = '''Usage: srun [-n ntasks] [-o out] [-e err]
-            [-c ncpus] [-p partition] [-t minutes]
-            [-D path] [-J jobname][--gid=group]
-            [--dependency=type:jobid][--comment=name]
-            [--nodelist=hosts][--exclude=hosts]
-            [--prolog=fname] [--epilog=fname]
-            [--gpus-per-task=n]
-            executable [args...]'''
-    donau_command = ""
-    option_dic = {}
     if os.environ.get("SRUN_CPUS_PER_TASK") is not None:
         option_dic["SRUN_CPUS_PER_TASK"] = os.environ.get("SRUN_CPUS_PER_TASK")
     if os.environ.get("SLURM_DEPENDENCY") is not None:
@@ -666,16 +591,109 @@ def main():
     if os.environ.get("SLURM_GPUS_PER_TASK") is not None:
         option_dic["SLURM_GPUS_PER_TASK"] = os.environ.get("SLURM_GPUS_PER_TASK")
 
-    blocked = True
-    output_mode = False
-    # process=subprocess.Popen(donau_command, shell=True, stdout=subprocess.PIPE, bufsize=1)
 
+def check_donau_cli_env():
+    sched_cli_home = os.getenv('CCSCHEDULER_CLI_HOME')
+    ccs_cli_home = os.getenv('CCS_CLI_HOME')
+    ca_cert_perm = os.getenv('CURL_CA_BUNDLE')
+    if sched_cli_home is None or ccs_cli_home is None or ca_cert_perm is None:
+        print('cli env home is not configured, '
+              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
+        sys.exit(1)
+    if ca_cert_perm is None:
+        print('cli ca_cert_perm is not specified,'
+              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
+        sys.exit(1)
+    global djob_path
+    djob_path = os.path.join(ccs_cli_home, 'bin', 'djob')
+    if not os.path.exists(djob_path):
+        print('djob path is not exist,'
+              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
+        sys.exit(1)
+
+
+def get_help_info():
+    help_info = '''Usage: srun [OPTIONS(0)... [executable(0) [args(0)...]]] [ : [OPTIONS(N)...]] executable(N) [args(N)...]
+
+Parallel run options:
+-b, --begin=time                       defer job until HH:MM MM/DD/YY
+-c, --cpus-per-task=ncpus              number of cpus required per task
+    --comment=name                     arbitrary comment
+-d, --dependency=type:jobid            defer job until condition on jobid is satisfied
+-D, --chdir=path                       change remote current working directory
+    --export=env_vars|NONE             environment variables passed to launcher with
+                                       optional values or NONE (pass no variables)
+-e, --error=err                        location of stderr redirection
+    --epilog=program                   run "program" after launching job step
+    --gid=group_id                     group ID to run job as (user root only)
+-J, --job-name=jobname                 name of job
+-n, --ntasks=ntasks                    number of tasks to run
+-o, --output=out                       location of stdout redirection
+    --open-mode={append|truncate}      mode of open the output and error files
+-p, --partition=partition              partition requested
+    --priority=value                   set the priority of the job to value
+    --prolog=program                   run "program" before launching job step
+    --pty                              run task zero in pseudo terminal
+-t, --time=minutes                     time limit
+
+Constraint options:
+-w, --nodelist=hosts...                request a specific list of hosts
+-x, --exclude=hosts...                 exclude a specific list of hosts 
+
+Consumable resources related options:
+    --exclusive                        for job allocation, this allocates nodes in
+                                       in exclusive mode
+                                       for job steps, this is equivalent to --exact
+
+GPU scheduling options:
+    --gpus-per-task=n                  number of GPUs required per spawned task
+
+Help options:
+    --help                             show this help message
+    --usage                            display brief usage message'''
+    return help_info
+
+
+def get_usage_info():
+    usage_info = '''Usage: srun [-n ntasks] [-o out] 
+            [--open-mode={append|truncate}] [-e err]
+            [-c ncpus] [-p partition] [-t minutes]
+            [-D path] [-J jobname][--gid=group]
+            [--dependency=type:jobid][--comment=name]
+            [--nodelist=hosts][--exclude=hosts]
+            [--prolog=fname] [--epilog=fname]
+            [--gpus-per-task=n]
+            executable [args...]'''
+    return usage_info
+
+if __name__ == '__main__':
+    if os.getuid() == 0:
+        print('Permission denied. The root user is not allowed to operate.')
+        log('Permission denied. The root user is not allowed to operate.')
+        sys.exit(1)
+
+    check_donau_cli_env()
+    init_config_with_env()
+    short_options = '-b:-c:-d:-D:-e:-J:-n:-o:-p:-t:-w:-x:'
+    long_options = ['begin=', 'cpus-per-task=', 'comment=', 'dependency=', 'chdir=',
+                    'export=','error=', 'gid=', 'epilog=', 'job-name=', 'ntasks=',
+                    'output=', 'open-mode=', 'partition=', 'priority=','prolog=',
+                    'pty', 'time=', 'exclusive', 'gpus-per-task=','nodelist=',
+                    'exclude=', 'usage', 'help']
     try:
         opts, args = getopt.getopt(sys.argv[1:], short_options, long_options)
-        handle_parameter_exception(opts)
-        if sys.argv[0][:-3] == "srun":
-            donau_command += "dsub "
-        update_dict(opts, option_dic)
+        # options from command have higher priority than environment
+        update_dict(opts)
+        if "HELP" in option_dic:
+            print(get_help_info())
+            log(get_help_info())
+            sys.exit()
+        if "USAGE" in option_dic:
+            print(get_usage_info())
+            log(get_usage_info())
+            sys.exit()
+        handle_parameter_exception()
+        donau_command += "dsub "
         if "PTY" in option_dic:
             blocked = False
         if "SLURM_OPEN_MODE" in option_dic and option_dic["SLURM_OPEN_MODE"] == 'append':
@@ -702,14 +720,6 @@ def main():
             donau_command += '-N ' + option_dic["SLURM_NTASKS"] + ' '
         if "SLURM_PARTITION" in option_dic:
             donau_command += '-q ' + '"' + option_dic["SLURM_PARTITION"] + '" '
-        if "HELP" in option_dic:
-            print(help_info)
-            log(help_info)
-            sys.exit()
-        if "USAGE" in option_dic:
-            print(usage_info)
-            log(usage_info)
-            sys.exit()
         if "BEGIN" in option_dic:
             donau_command += '-S "' + time_format(option_dic["BEGIN"]) + '" '
         if "COMMENT" in option_dic:
@@ -776,12 +786,10 @@ def main():
                 donau_command += " " + item
             print(donau_command)
             log(donau_command)
-            global process
             process = subprocess.Popen(donau_command, shell=True, stdout=subprocess.PIPE, bufsize=1)
             for item in iter(process.stdout.readline, b''):
                 print(item.decode().replace('\n', ''))
                 log(item.decode().replace('\n', ''))
-
     except getopt.GetoptError as err:
         invalid_option = get_invalid_option(str(err))
         print_invalid_info(invalid_option)
@@ -795,15 +803,3 @@ def main():
                 sys.exit(process.returncode)
     except:
         sys.exit()
-
-
-if __name__ == '__main__':
-    is_debug = False
-    log_file = ""
-    process = False
-    init_config_with_env()
-    if os.getuid() == 0:
-        print('Permission denied. The root user is not allowed to operate.')
-        log('Permission denied. The root user is not allowed to operate.')
-        sys.exit()
-    main()
