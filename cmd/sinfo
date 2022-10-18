@@ -20,6 +20,27 @@ output_target_values_list = []
 # donau_cmd_list = {'dnode -L':"-------\nmessage\n", 'dnode -aff':""}
 executed_donau_cmd_dict = {}
 
+is_debug = False
+
+def log(content):
+    if is_debug :
+        f = open(log_file, 'a+')
+        f.write(content + '\n')
+        f.close()
+
+def init_log_file_name():
+    global log_file
+    file_name = '%s.%d.%d' % ('sinfo', os.getuid(), os.getpid())
+    log_file = os.path.join('/tmp/', file_name)
+    log(datetime.now().strftime('%a %b %d %H:%M:%S %Y'))
+
+def init_config_with_env():
+    global is_debug
+    debug_env = os.getenv('SLURM_TO_DONAU_DEBUG')
+    if debug_env is not None and debug_env.lower() == 'true':
+        is_debug = True
+        init_log_file_name()
+
 def print_help():
     print("""Usage: sinfo [OPTIONS]
   -l, --long                 long output - displays more information
@@ -80,7 +101,9 @@ def get_slurm_cmd_opts_hit_map(opts, args):
             opts_hit_map["N"] = value
         else:
             print_slurm_cmd_invalid_opt(opt)
+            log("sinfo convert to donau command failed : invalid option : " + opt)
             return False
+    log("get opt,value pairs : " + str(opts_hit_map))
     return True
 
 def get_output_head_list():
@@ -470,6 +493,7 @@ def get_output_target_values():
     for head in output_head_list:
         func = function_map.get(head, func_default)
         output_target_values_list[index] = func()
+        log("get title '" + head + "' values from donau : " + str(output_target_values_list[index]))
         index += 1
 
 def select_ret_with_opts(opts):
@@ -505,7 +529,9 @@ def select_ret_with_opts(opts):
 
 def extend_with_partirion():
     global output_head_list
+    global opts_hit_map
     global output_target_values_list
+    keys = list(opts_hit_map.keys())
     if "PARTITION" not in output_head_list:
         return
     if len(output_target_values_list) == 0:
@@ -515,6 +541,12 @@ def extend_with_partirion():
         raw_out_line = [output_target_values_list[i][index] for i in range(len(output_head_list))]
         partition_index = output_head_list.index("PARTITION")
         # print(raw_out_line)
+        if "p" not in keys and "N" in keys:
+            new_out_line = raw_out_line
+            new_out_line[partition_index] = "all"
+            for i in range(len(output_head_list)):
+                new_ret[i].append(new_out_line[i])
+            continue
         for single_partition in raw_out_line[partition_index].split(','):
             new_out_line = raw_out_line
             new_out_line[partition_index] = single_partition
@@ -559,6 +591,7 @@ if __name__ == '__main__':
         print("Permission denied. The root user is not allowed to operate.")
         sys.exit(1)
     check_donau_cli_env()
+    init_config_with_env()
     check_token()
     try:
         opts_hit_map.clear()
@@ -580,6 +613,7 @@ if __name__ == '__main__':
         select_ret_with_opts(opts)
         # print(output_target_values_list)
         print_format()
+        log("sinfo convert to donau command successfully!")
         
     except getopt.GetoptError as err:
         invalid_option = get_invalid_option_response(str(err))

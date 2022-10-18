@@ -137,6 +137,11 @@ def get_invalid_option(err_message):
         options = re.findall(r'option (.*) not recognized', err_message)
         if len(options) == 1:
             return options[0]
+    if 'requires argument' in err_message:
+        options = re.findall(r'option (.*) requires argument', err_message)
+        if len(options) == 1:
+            print_single_option(options[0])
+            sys.exit(1)
     return ''
 
 
@@ -144,7 +149,8 @@ def check_user(user_name):
     try:
          pwd.getpwnam(user_name)
     except KeyError:
-        return False
+        print('squeue: error: Invalid user: %s' % user_name)
+        sys.exit(1)
     return True
 
 
@@ -156,6 +162,19 @@ def print_invalid_option(option):
     else:
         print("squeue: invalid option -- '" + option[1:] + "'")
     print('''Try "squeue --help" for more information''')
+
+
+def print_single_option(option):
+    if len(option) < 2:
+        return
+    if option.startswith('--'):
+        print("squeue: option '%s' requires an argument" % option)
+        print('Try "squeue --help" for more informatio')
+        return
+    if option[0] == '-':
+        print("squeue: option requires an argument -- '%s'" % option[1:])
+        print('Try "squeue --help" for more informatio')
+        return
 
 
 def print_invalid_state(state):
@@ -240,12 +259,27 @@ def parse_job_info(line):
 def check_result_error(out_line):
     global job_err_info
     # check permission
-    if 'access to job' in out_line or 'not exist' in out_line:
+    if 'access to job' in out_line:
         err_out = ' '.join(out_line.split()[1:])
         job_err_info.append(err_out)
         return False
+    if 'only permitted' in out_line:
+        err_list = out_line.split()
+        job_err_info.append(' '.join(err_list[1:]))
+        return False
+    if 'the permission' in out_line:
+        err_list = out_line.split()
+        job_err_info.append(' '.join(err_list[1:]))
+        return False
+    if 'not exist' in out_line:
+        job_id = out_line.split()[0]
+        err_msg = 'slurm_load_jobs error: Invalid job id specified'
+        if job_id.isdigit():
+            err_msg = 'slurm_load_jobs error: Invalid job id %s specified' % job_id
+        job_err_info.append(err_msg)
+        return False
     if out_line.startswith('---'):
-        return True
+        return False
     out_job_info = out_line.split()
     if len(out_job_info) > 0 and out_job_info[0].isdigit():
         return True
@@ -291,13 +325,12 @@ def get_job_dict():
             # ignore invalid user name
             if not check_user(user_name):
                 continue
-            if user_name != pwd.getpwuid(os.getuid())[0]:
-                print('squeue: error: Query job error on user %s: Access/permission denied' % user_name)
-                sys.exit(1)
             support_users.append(user_name)
         # support user without valid users
         if len(job_users) > 0 and len(support_users) == 0:
             return {}
+        if len(support_users) > 0:
+            query_command += ' -u ' + '\'' + ' '.join(support_users) + '\''
     # filter job_state
     donau_job_states = convert_donau_job_states(job_states)
     if len(donau_job_states) == 0:
@@ -400,6 +433,8 @@ def print_job_info(info):
     donau_state = info.get(DISPLAY_STATE)
     if donau_state is not None:
         display_state = cnvert_to_slurm_state(donau_state)
+    if len(display_state) > STATE_STR_LEN_LIMIT:
+        display_state = display_state[:STATE_STR_LEN_LIMIT]
     display_time = info.get(DISPLAY_RUN_TIME)
     if len(display_time) > TIME_STR_LEN_LIMIT:
         display_time = display_time[:TIME_STR_LEN_LIMIT]
