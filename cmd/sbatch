@@ -659,9 +659,8 @@ def init_log_file_name():
     global log_file
     file_name = '%s.%d.%d' % ('sbatch', os.getuid(), os.getpid())
     log_file = os.path.join('/tmp/', file_name)
-    print('log_file:' + str(log_file))
 
-
+    
 # init options from environment
 def init_config_with_env():
     global is_debug
@@ -747,16 +746,15 @@ Help options:
 
 
 def get_usage_info():
-    usage_info = '''Usage: sbatch [-N nnodes] [-n ntasks] 
-              [-c ncpus] [-p partition] [-t minutes]
-              [-D path] [--mpi mpi_type] [--output file]
-              [--open-mode={append|truncate}] [--error file] 
-              [--chdir=directory] [-J jobname] [--gid=group] 
-              [--dependency=type:jobid] [--comment=name] 
-              [--ntasks-per-node=n] [--nodelist=hosts]
-              [--exclude=hosts] [--export[=names]] 
-              [--exclusive] [--gpus-per-task=n]
-              executable [args...]'''
+    usage_info = '''Usage: [-N nnodes] [-n ntasks] [-b "HH:MM MM/DD/YY"]
+       [-c ncpus] [-p partition] [-e err] [ --time=minutes]
+       [-D path] [--mpi mpi_type] [--output file]
+       [--open-mode={append|truncate}] [--error file] 
+       [--priority=value] [--chdir=directory] [-J jobname] 
+       [--gid=group] [--dependency=type:jobid] [--comment=name]
+       [--ntasks-per-node=n] [--nodelist=hosts][--exclude=hosts] 
+       [--export[=names] [--exclusive] [--gpus-per-task=n]
+       executable [args...]'''
     return usage_info
 
 
@@ -949,7 +947,6 @@ if __name__ == '__main__':
             donau_command += '-s'
             for item in args:
                 donau_command += " " + item
-            print(donau_command)
             log(donau_command)
             process = subprocess.Popen(donau_command, shell=True, stdout=subprocess.PIPE, bufsize=1)
             process.wait()

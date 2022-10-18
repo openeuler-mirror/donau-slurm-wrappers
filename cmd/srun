@@ -551,7 +551,6 @@ def init_log_file_name():
     global log_file
     file_name = '%s.%d.%d' % ('srun', os.getuid(), os.getpid())
     log_file = os.path.join('/tmp/', file_name)
-    print('log_file:' + str(log_file))
 
 
 # init options from environment
@@ -657,14 +656,14 @@ Help options:
 
 
 def get_usage_info():
-    usage_info = '''Usage: srun [-n ntasks] [-o out] 
+    usage_info = '''Usage: srun [-n ntasks] [-o out][-b "HH:MM MM/DD/YY"]
             [--open-mode={append|truncate}] [-e err]
-            [-c ncpus] [-p partition] [-t minutes]
-            [-D path] [-J jobname][--gid=group]
+            [-c ncpus] [-p partition] [--priority=value][--pty]
+            [-t minutes] [-D path][-J jobname][--gid=group]
             [--dependency=type:jobid][--comment=name]
-            [--nodelist=hosts][--exclude=hosts]
-            [--prolog=fname] [--epilog=fname]
-            [--exclusive] [--gpus-per-task=n]
+            [--nodelist=hosts][--exclude=hosts][--export=env_vars]
+            [--prolog=fname] [--epilog=fname][--exclusive]
+            [--gpus-per-task=n]
             executable [args...]'''
     return usage_info
 
@@ -787,7 +786,6 @@ if __name__ == '__main__':
         else:
             for item in args:
                 donau_command += " " + item
-            print(donau_command)
             log(donau_command)
             if blocked:
                 process = subprocess.Popen(donau_command, shell=True, stdout=subprocess.PIPE, bufsize=1)
