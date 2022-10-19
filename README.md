@@ -19,9 +19,10 @@ python2/python3
 #### 安装教程
 
 1.  从网址https://gitee.com/openeuler/donau-slurm-wrappers下载最新的脚本
-2.  更改脚本的属主为DONAU的CLI用户, 修改权限为555， 例如当前用户为ccs_cli，则
-    chown -R ccs_cli:ccs_cli cmd
-    chmod 555 cmd/* 
+2.  更改脚本的属主为DONAU的CLI用户, 修改权限为555， 例如当前用户为ccs_cli，则执行
+    
+     
+     $chown -R ccs_cli:ccs_cli cmd && chmod 555 cmd/* 
     
 
 #### 使用说明
