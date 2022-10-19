@@ -2,14 +2,15 @@
 
 #### 介绍
 donau-slurm-wrappers提供了一些slurm命名风格的脚本，方便习惯使用slurm的用户快速上手donau的业务。
-目前支持的命令有:
-·srun
-·sbatch
-·squeue
-·scontrol
-·sinfo
-·scancel
-·sacct
+目前支持的命令有: 
+
+   作业提交命令: srun, sbatch
+
+   作业查询命令: squeue, sacct
+   
+   作业控制命令: scancel, scontrol
+   
+   节点查询命令: sinfo
 
 #### 软件架构
 python2/python3
@@ -29,6 +30,7 @@ python2/python3
     srun用于提交阻塞式作业。如果直接使用srun提交作业，会默认转成dsub –Kco提交阻塞式作业，如果srun
  指定--pty，则转换成dsub -I提交交互式作业。对于交互式作业，需要提交到指定队列执行。用户需要参考HPC产品文档，
  配置支持交互式作业的队列。用户通过sinfo查看当前partition，然后使用srun --pty –p指定partition提交交互式作业。
+    
     
     
     $srun --usage
@@ -56,6 +58,7 @@ python2/python3
 $CCS_MPI_OPTIONS。
     
     
+    
     $sbatch --usage
     Usage: sbatch [-N nnodes] [-n ntasks] 
                 [-c ncpus] [-p partition] [-t minutes]
@@ -68,8 +71,8 @@ $CCS_MPI_OPTIONS。
                 executable [args...]
                 
 普通作业举例:
-   脚本
    
+    #脚本文件  
     $cat hello.sh
     #!/bin/sh
     #SBATCH --comment test_job
@@ -88,13 +91,13 @@ $CCS_MPI_OPTIONS。
     
 
 MPI作业举例:
-    脚本
     
+    #脚本文件    
     $cat mpi_job.sh 
     #! /bin/sh
     #SBATCH -o /tmp/%j.txt         #重定向输出
-    #SBATCH --comment=script_job  #指定comments
-    #SBATCH -n4                  #指定task个数
+    #SBATCH --comment=script_job   #指定comments
+    #SBATCH -n4                    #指定task个数
     mpirun $CCS_MPI_OPTIONS user_application
     
    执行
@@ -108,30 +111,33 @@ RUNNING, PENDING/WAITING, STOPPED。显示结果中"NODELIST(REASON)"的未调�
 中task的"MAIN_STATE_REASON_CODE", 具体原因参考《HPC产品文档》。
 
 
+    
     $squeue --usage
     Usage: squeue [--job jobid] [-n name] [-p partitions]
               [-t states] [-u user_name] [--usage] [-l]   
+
 举例:
 
+
     $squeue
-    JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
-      519   root.q1  default  test_st  R       0:20      1 kwephicprd18119
+    JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)       
       520   root.q1  default  test_st PD       0:00      - 20615
       521   root.q1  default  test_st PD       0:00      - 10101
-      522   root.q1  default  test_st  S       0:00      1 kwephicprd18119
+      522   root.q1  default  test_st  S   11:28:42      1 kwephicprd18119
     
     $squeue -l
-    Tue Oct 18 22:02:43 2022
-    JOBID PARTITION     NAME     USER    STATE       TIME TIME_LIMI   NODES NODELIST(REASON)
-      519   root.q1  default  test_st  RUNNING       2:00 UNLIMITED       1  kwephicprd18119
-      520   root.q1  default  test_st  PENDING       0:00 UNLIMITED       -            20615
-      521   root.q1  default  test_st  PENDING       0:00 UNLIMITED       -            10101
-      522   root.q1  default  test_st SUSPENDE       1:40 UNLIMITED       1  kwephicprd18119
+    Wed Oct 19 09:30:34 2022
+        JOBID PARTITION     NAME     USER    STATE       TIME TIME_LIMI   NODES NODELIST(REASON)
+          520   root.q1  default  test_st  PENDING       0:00 UNLIMITED       -            20615 
+          521   root.q1  default  test_st  PENDING       0:00 UNLIMITED       -            10101
+          522   root.q1  default  test_st SUSPENDE   11:29:22 UNLIMITED       1  kwephicprd18119
+    
 
 4.  scancel命令
     scancel支持终止未完成的作业，对应的DONAU命令为djob -T, 执行scancel后的作业状态为CANCELLED。
 
 
+    
     $scancel --usage
     Usage: scancel [-n job_name] [-p partitions]
               [-t PENDING | RUNNING | SUSPENDED] [--usage] [-u user_name] [job_id]
@@ -139,6 +145,7 @@ RUNNING, PENDING/WAITING, STOPPED。显示结果中"NODELIST(REASON)"的未调�
 5.  sinfo命令
     sinfo用于查询当前集群的节点和分区信息(SLURM的PARTITION和DONAU的QUEUE是两种概念，为了用户对指定QUEUE
 进行操作，将QUEUE和PARTITION对应)。
+    
     
     
     $sinfo --usage
@@ -166,6 +173,7 @@ RUNNING, PENDING/WAITING, STOPPED。显示结果中"NODELIST(REASON)"的未调�
     scontrol命令用于停止/恢复作业，对应DONAU的djob -S和djob -R。
     
     
+    
     $scontrol --usage
     scontrol: invalid option '--usage'
     Try "scontrol --help" for more information
@@ -175,6 +183,7 @@ RUNNING, PENDING/WAITING, STOPPED。显示结果中"NODELIST(REASON)"的未调�
 作业状态为SUCCEEDED, FAILED, RUNNING)。
 
     
+   
     $sacct --usage
     Usage: sacct [--name] [-S starttime] [-E endtime] [-r partition]
               [-s state] [-u user] [-j jobs] [-b]
@@ -205,8 +214,10 @@ RUNNING, PENDING/WAITING, STOPPED。显示结果中"NODELIST(REASON)"的未调�
 1). 报错: "error: access token does not exist, please execute command dconfig to get token"
     说明: 用户在执行CLI命令前，没有使用dconfig命令获取身份验证的token，需要执行dconfig命令获取token。
     或者用户在执行dconfig命令后，由于某种原因导致存储token的文件丢失，这种情况需要再次执行dconfig命令。
+
 2). 报错: "error: token expired! refresh token does not exist, please execute command dconfig to get token"
     说明: 这种情况是因为token过期，且之前dconfig命令时没有返回用于刷新的refresh token。
+
 3). 报错: "token unauthorized"
     说明: 用户未授权，没有加入用户组或管理员组。
     

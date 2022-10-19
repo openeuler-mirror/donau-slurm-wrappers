@@ -747,13 +747,13 @@ Help options:
 
 def get_usage_info():
     usage_info = '''Usage: [-N nnodes] [-n ntasks] [-b "HH:MM MM/DD/YY"]
-       [-c ncpus] [-p partition] [-e err] [ --time=minutes]
+       [-c ncpus] [-p partition] [-e err] [--time=minutes]
        [-D path] [--mpi mpi_type] [--output file]
        [--open-mode={append|truncate}] [--error file] 
        [--priority=value] [--chdir=directory] [-J jobname] 
        [--gid=group] [--dependency=type:jobid] [--comment=name]
        [--ntasks-per-node=n] [--nodelist=hosts][--exclude=hosts] 
-       [--export[=names] [--exclusive] [--gpus-per-task=n]
+       [--export[=names]] [--exclusive] [--gpus-per-task=n]
        executable [args...]'''
     return usage_info
 
