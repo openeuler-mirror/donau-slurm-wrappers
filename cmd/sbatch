@@ -1,0 +1,981 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*
+import datetime
+import time
+import re
+import sys
+import getopt
+import os
+import subprocess
+from dateutil.relativedelta import relativedelta
+
+
+#global variable definition
+is_debug = False
+log_file = ""
+donau_command = ""
+option_dic = {}
+
+
+def split_num_letters(astr):
+    nums, letters = "", ""
+    for i in astr:
+        if i.isdigit():
+            nums = nums + i
+        elif i.isspace():
+            pass
+        else:
+            letters = letters + i
+    return nums, letters
+
+
+def convert_now(begin_time):
+    time_converted = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
+    if begin_time == "now":
+        return time_converted
+    time_count, time_unit = split_num_letters(begin_time[4:])
+    if time_unit == "" or time_unit == "seconds":
+        time_converted = (datetime.datetime.now()
+                          + relativedelta(seconds=int(time_count))).strftime('%Y/%m/%d %H:%M:%S')
+    elif time_unit == "minutes":
+        time_converted = (datetime.datetime.now()
+                          + relativedelta(minutes=int(time_count))).strftime('%Y/%m/%d %H:%M:%S')
+    elif time_unit == "hours":
+        time_converted = (datetime.datetime.now()
+                          + relativedelta(hours=int(time_count))).strftime('%Y/%m/%d %H:%M:%S')
+    elif time_unit == "days":
+        time_converted = (datetime.datetime.now()
+                          + relativedelta(days=int(time_count))).strftime('%Y/%m/%d %H:%M:%S')
+    elif time_unit == "weeks":
+        time_converted = (datetime.datetime.now()
+                          + relativedelta(weeks=int(time_count))).strftime('%Y/%m/%d %H:%M:%S')
+    return time_converted
+
+
+def converthh_mm_ss(hh_mm_ss):
+    if hh_mm_ss.count(':') == 1:
+        hh_mm_ss += ':00'
+    time_day = time.strftime('%Y/%m/%d', time.localtime())
+    time_str = time_day + " " + hh_mm_ss
+    time_form = time.strptime(time_str, '%Y/%m/%d %H:%M:%S')
+    if int(time.mktime(time_form)) - int(time.mktime(datetime.datetime.now().timetuple())) < 0:
+        time_tomorrow_r = datetime.datetime.now() + datetime.timedelta(days=1)
+        time_tomorrow = time.strftime('%Y/%m/%d', time_tomorrow_r.timetuple())
+        time_str = time_tomorrow + " " + hh_mm_ss
+    return time_str
+
+
+def time_is_match(time_out):
+    is_match=False
+    pattern1 = re.compile("(\d+-){0,1}(\d+:){0,2}(\d+){0,1}").match(time_out)
+    if pattern1 is not None and pattern1.group(0) == time_out:
+        is_match = True
+    return is_match
+
+
+def convert_timeout(time_out):
+    timeout_converted = ''
+    if '-' in time_out and ':' in time_out:
+        time_out_be, time_out_af = time_out.strip().split('-')
+        if time_out_af.count(':') == 2:
+            timeout_hms = time_out_af.strip().split(':')
+            seconds = int(timeout_hms[2]) % 60
+            minutes = (int(timeout_hms[1]) + int(timeout_hms[2]) / 60) % 60
+            hours = int(time_out_be) * 24 + int(timeout_hms[0]) \
+                    + (int(timeout_hms[1]) + int(timeout_hms[2]) / 60) / 60
+            timeout_converted += str(hours) + 'h' + str(minutes) + 'm' + str(seconds) + 's'
+        elif time_out_af.count(':') == 1:
+            timeout_hm = time_out_af.strip().split(':')
+            minutes = int(timeout_hm[1]) % 60
+            hours = int(time_out_be) * 24 + int(timeout_hm[0]) + int(timeout_hm[1]) / 60
+            timeout_converted += str(hours) + 'h' + str(minutes) + 'm'
+    elif '-' in time_out:
+        time_out_d, time_out_h = time_out.strip().split('-')
+        hours = int(time_out_d) * 24 + int(time_out_h)
+        timeout_converted += str(hours) + 'h'
+    elif ':' in time_out:
+        if time_out.count(':') == 2:
+            timeout_hms = time_out.strip().split(':')
+            seconds = int(timeout_hms[2]) % 60
+            minutes = (int(timeout_hms[1]) + int(timeout_hms[2]) / 60) % 60
+            hours = int(timeout_hms[0]) + (int(timeout_hms[1]) + int(timeout_hms[2]) / 60) / 60
+            timeout_converted += str(hours) + 'h' + str(minutes) + 'm' + str(seconds) + 's'
+        elif time_out.count(':') == 1:
+            timeout_ms = time_out.strip().split(':')
+            seconds = int(timeout_ms[1]) % 60
+            minutes = (int(timeout_ms[0]) + int(timeout_ms[1]) / 60) % 60
+            if (int(timeout_ms[0]) + int(timeout_ms[1]) / 60) / 60 > 0:
+                hours = (int(timeout_ms[0]) + int(timeout_ms[1]) / 60) / 60
+                timeout_converted += str(hours) + 'h' + str(minutes) + 'm' + str(seconds) + 's'
+            else:
+                timeout_converted += str(minutes) + 'm' + str(seconds) + 's'
+    else:
+        if int(time_out) / 60 > 0:
+            minutes = int(time_out) % 60
+            hours = int(time_out) / 60
+            timeout_converted += str(hours) + 'h' + str(minutes) + 'm'
+        else:
+            timeout_converted += time_out + 'm'
+    return timeout_converted
+
+
+def convert_day(begin_time):
+    time_form = datetime.date.today()
+    if re.match('\d{2}\d{2}\d{2}', begin_time):
+        begin_time_r = begin_time[:2] + '/' + begin_time[2:4] + '/' + begin_time[4:]
+        time_form = time.strptime(begin_time_r, '%m/%d/%y')
+    elif re.match('\d{2}/\d{2}/\d{2}', begin_time):
+        time_form = time.strptime(begin_time, '%m/%d/%y')
+    elif re.match('\d{4}-\d{2}-\d{2}', begin_time):
+        time_form = time.strptime(begin_time, '%Y-%m-%d')
+    return time.strftime('%Y/%m/%d %H:%M:%S', time_form)
+
+    
+#check whether the begintime variable format is legal
+def begintime_is_match(begintime):
+    is_begintime = False
+    if begintime in ('today', 'tomorrow', 'now'):
+        is_begintime = True
+    elif "now" in begintime:
+        if begintime.startswith("now+") and len(begintime) > 4:
+            index_end = 4
+            for i in range(len(begintime[4:])):
+                if not begintime[4 + i].isdigit():
+                    index_end = 4 + i
+                    break
+            if index_end == 4\
+                    or (begintime[index_end:] in ("", "minutes", "hours", "days", "weeks")):
+                is_begintime = True
+    elif begintime.strip().count(' ') == 0:
+        pattern1 = re.compile("T{0,1}(\d{4}-\d{2}-\d{2}){0,1}T{0,1}\d{2}(:\d{2}){1,2}(AM|PM)*T{0,1}").match(begintime)
+        pattern2 = re.compile("T{0,1}(\d{2}/\d{2}/\d{2}){0,1}T{0,1}\d{2}(:\d{2}){1,2}(AM|PM)*T{0,1}").match(begintime)
+        pattern3 = re.compile("T{0,1}\d{2}(:\d{2}){1,2}(AM|PM)*T{0,1}(\d{4}-\d{2}-\d{2}){0,1}T{0,1}").match(begintime)
+        pattern4 = re.compile("T{0,1}\d{2}(:\d{2}){1,2}(AM|PM)*T{0,1}(\d{2}/\d{2}/\d{2}){0,1}T{0,1}").match(begintime)
+        pattern5 = re.compile("T{0,1}\d{4}-\d{2}-\d{2}T{0,1}").match(begintime)
+        pattern6 = re.compile("T{0,1}\d{2}/\d{2}/\d{2}T{0,1}").match(begintime)
+        pattern7 = re.compile("T{0,1}\d{6}T{0,1}").match(begintime)
+        if (pattern1 is not None and pattern1.group(0) == begintime)\
+                or (pattern2 is not None and pattern2.group(0) == begintime)\
+                or (pattern3 is not None and pattern3.group(0) == begintime)\
+                or (pattern4 is not None and pattern4.group(0) == begintime)\
+                or (pattern5 is not None and pattern5.group(0) == begintime)\
+                or (pattern6 is not None and pattern6.group(0) == begintime)\
+                or (pattern7 is not None and pattern7.group(0) == begintime):
+            is_begintime = True
+    elif begintime.strip().count(' ') > 0:
+        before, after = begintime.strip().split()
+        if ':' in after:
+            before, after = after, before
+        begintime = ' '.join([before, after])
+        pattern1 = re.compile("T{0,1}\d{2}(:\d{2}){1,2}(AM|PM)*T{0,1} T{0,1}\d{2}/\d{2}/\d{2}T{0,1}").match(begintime)
+        pattern2 = re.compile("T{0,1}\d{2}(:\d{2}){1,2}(AM|PM)*T{0,1} T{0,1}\d{4}-\d{2}-\d{2}T{0,1}").match(begintime)
+        pattern3 = re.compile("T{0,1}\d{2}(:\d{2}){1,2}(AM|PM)*T{0,1} T{0,1}\d{6}T{0,1}").match(begintime)
+        if pattern1 is not None and pattern1.group(0) == begintime\
+                or (pattern2 is not None and pattern2.group(0) == begintime)\
+                or (pattern3 is not None and pattern3.group(0) == begintime):
+            is_begintime = True
+    return is_begintime
+
+    
+#begintime parameter format is uniformly converted to yyyy/MM/dd HH24:mm:ss format
+def time_format(input_time):
+    try:
+        if "AM" in input_time or "PM" in input_time:
+            index = input_time.find(':')
+            if index == -1:
+                raise Exception
+            elif index - 2 >= 0:
+                if int(input_time[index - 2:index]) > 12:
+                    raise Exception
+                elif index - 2 == 0 and "AM" in input_time and int(input_time[index - 2:index]) == 12:
+                    input_time = input_time.replace("AM", "")
+                    input_time = "00" + input_time[2:]
+                elif index - 2 == 0 and "AM" in input_time and int(input_time[index - 2:index]) < 12:
+                    input_time = input_time.replace("AM", "")
+                elif index - 2 > 0 and "AM" in input_time and int(input_time[index - 2:index]) == 12:
+                    input_time = input_time.replace("AM", "")
+                    input_time = input_time[:index - 2] + "00" + input_time[index:]
+                elif index - 2 > 0 and "AM" in input_time and int(input_time[index - 2:index]) < 12:
+                    input_time = input_time.replace("AM", "")
+                elif "PM" in input_time and int(input_time[index - 2:index]) == 12:
+                    input_time = input_time.replace("PM", "")
+                elif index - 2 == 0 and "PM" in input_time and int(input_time[index - 2:index]) < 12:
+                    input_time = input_time.replace("PM", "")
+                    input_time = str(int(input_time[:2]) + 12) + input_time[2:]
+                elif index - 2 > 0 and "PM" in input_time and int(input_time[index - 2:index]) < 12:
+                    input_time = input_time.replace("PM", "")
+                    input_time = input_time[:index - 2] + str(int(input_time[index - 2:index]) + 12) + input_time[
+                                                                                                       index:]
+        if "T" in input_time:
+            input_time = input_time.replace('T', ' ')
+        if input_time.strip().count(' ') == 0 and input_time.count(':') > 0 \
+                and ('-' in input_time or '/' in input_time):
+            index = input_time.find(':')
+            if index == -1:
+                raise Exception
+            elif index - 2 == 0:
+                if '-' in input_time:
+                    index = input_time.find('-')
+                    if index == -1:
+                        raise Exception
+                    elif index - 4 >= 0:
+                        input_time = input_time[:index - 4] + ' ' + input_time[index - 4:]
+                elif '/' in input_time:
+                    index = input_time.find('/')
+                    if index == -1:
+                        raise Exception
+                    elif index - 2 >= 0:
+                        input_time = input_time[:index - 2] + ' ' + input_time[index - 2:]
+            elif index - 2 > 0:
+                input_time = input_time[:index - 2] + ' ' + input_time[index - 2:]
+        if input_time == "today" or input_time == "now":
+            return (datetime.datetime.now() + relativedelta(seconds=2)).strftime('%Y/%m/%d %H:%M:%S')
+        elif input_time == "tomorrow":
+            return (datetime.datetime.now() + relativedelta(days=1)).strftime('%Y/%m/%d %H:%M:%S')
+        elif "now" in input_time and input_time.startswith("now+") and len(input_time) > 4:
+            return convert_now(input_time)
+        elif input_time.strip().count(' ') == 0 and input_time.count(':') == 0:
+            return convert_day(input_time)
+        elif input_time.strip().count(' ') == 0 and input_time.count(':') > 0 \
+                and '-' not in input_time and '/' not in input_time:
+            return converthh_mm_ss(input_time)
+        elif input_time.strip().count(' ') > 0:
+            before, after = input_time.strip().split()
+            if ':' in after:
+                before, after = after, before
+            input_time = ' '.join([before, after])
+            pattern1 = re.compile("\d{2}:\d{2} \d{2}/\d{2}/\d{2}").match(input_time)
+            pattern2 = re.compile("\d{2}:\d{2} \d{4}-\d{2}-\d{2}").match(input_time)
+            pattern3 = re.compile("\d{2}:\d{2}:\d{2} \d{2}/\d{2}/\d{2}").match(input_time)
+            pattern4 = re.compile("\d{2}:\d{2}:\d{2} \d{4}-\d{2}-\d{2}").match(input_time)
+            pattern5 = re.compile("\d{2}(:\d{2}){1,2} \d{6}").match(input_time)
+            if pattern1 is not None and pattern1.group(0) == input_time:
+                time_form = datetime.datetime.strptime(input_time, '%H:%M %m/%d/%y')
+                return time_form.strftime('%Y/%m/%d %H:%M:%S')
+            elif pattern2 is not None and pattern2.group(0) == input_time:
+                time_form = datetime.datetime.strptime(input_time, '%H:%M %Y-%m-%d')
+                return time_form.strftime('%Y/%m/%d %H:%M:%S')
+            elif pattern3 is not None and pattern3.group(0) == input_time:
+                time_form = datetime.datetime.strptime(input_time, '%H:%M:%S %m/%d/%y')
+                return time_form.strftime('%Y/%m/%d %H:%M:%S')
+            elif pattern4 is not None and pattern4.group(0) == input_time:
+                time_form = datetime.datetime.strptime(input_time, '%H:%M:%S %Y-%m-%d')
+                return time_form.strftime('%Y/%m/%d %H:%M:%S')
+            elif pattern5 is not None and pattern5.group(0) == input_time:
+                before, after = input_time.strip().split()
+                begin_time_r = after[:2] + '/' + after[2:4] + '/' + after[4:]
+                time_form = time.strptime(begin_time_r, '%m/%d/%y')
+                time_day = time.strftime('%Y/%m/%d', time_form)
+                if before.count(':') == 1:
+                    before += ':00'
+                time_str = time_day + " " + before
+                time_form = time.strptime(time_str, '%Y/%m/%d %H:%M:%S')
+                if int(time.mktime(time_form)) - int(time.mktime(datetime.datetime.now().timetuple())) < 0:
+                    time_tomorrow_r = datetime.datetime.now() + datetime.timedelta(days=1)
+                    time_tomorrow = time.strftime('%Y/%m/%d', time_tomorrow_r.timetuple())
+                    time_str = time_tomorrow + " " + after
+                return time_str
+    except:
+        error_info = 'Invalid time specification:' + input_time + '\n' + \
+                     'sbatch: error: Invalid --begin specification'
+        print(error_info)
+        log(error_info)
+        sys.exit()
+    return datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
+
+    
+#check the format of the depdency parameter
+def match_dependency(condition):
+    is_dependency = False
+    if condition.count(':') == 1:
+        input_s = condition.strip().split(':')
+        title, content = input_s[0], input_s[1]
+        is_title = title in ('afterok', 'afternotok', 'after')
+        is_content = True
+        for job in content.strip().split(','):
+            if not job.isdigit():
+                is_content = False
+        is_dependency = is_title and is_content
+    return is_dependency
+
+
+def split_dependency(dependency):
+    task_status = {'afterok': 'SUCCEEDED', 'afternotok': 'FAILED', 'after': 'ENDED'}
+    input_s = dependency.strip().split(':')
+    title, content = input_s[0], input_s[1]
+    jobs = content.strip().split(',')
+    operation = ""
+    if len(jobs) == 1:
+        operation += '"' + jobs[0] + '=' + task_status[title] + '"'
+    elif len(jobs) > 1:
+        operation += '"' + jobs[0] + '=' + task_status[title] + ';'
+        for i in range(1, len(jobs) - 1):
+            operation += jobs[i] + '=' + task_status[title] + ';'
+        operation += jobs[len(jobs) - 1] + '=' + task_status[title] + '"'
+    return operation
+
+
+def get_invalid_option(err_message):
+    if "not recognized" in err_message:
+        options = re.findall(r'option -(.*) not recognized', err_message)
+        if len(options) == 1:
+            return options[0]
+    return ""
+
+
+def print_invalid_info(option):
+    print("sbatch: invalid option -- '" + option + "'")
+    log("sbatch: invalid option -- '" + option + "'")
+    print('Try "sbatch --help" for more information')
+    log('Try "sbatch --help" for more information')
+
+
+def update_dict(opts):
+    global option_dic
+    for opt_name, opt_value in opts:
+        if opt_name == '--help':
+            option_dic["HELP"] = opt_value
+        if opt_name == '--usage':
+            option_dic["USAGE"] = opt_value
+        if opt_name == '-b' or opt_name == '--begin':
+            option_dic["BEGIN"] = opt_value
+        if opt_name == '-c' or opt_name == '--cpus-per-task':
+            option_dic["SBATCH_CPUS_PER_TASK"] = opt_value
+        if opt_name == '--comment':
+            option_dic["COMMENT"] = opt_value
+        if opt_name == '-d' or opt_name == '--dependency':
+            option_dic["SLURM_DEPENDENCY"] = opt_value
+        if opt_name == '-D' or opt_name == '--chdir':
+            option_dic["SLURM_WORKING_DIR"] = opt_value
+        if opt_name == '--export':
+            option_dic["SBATCH_EXPORT"] = opt_value
+        if opt_name == '-e' or opt_name == '--error':
+            option_dic["SBATCH_ERROR"] = opt_value
+        if opt_name == '--gid':
+            option_dic["GID"] = opt_value
+        if opt_name == '-J' or opt_name == '--job_name':
+            option_dic["SBATCH_JOB_NAME"] = opt_value
+        if opt_name == '--mpi':
+            option_dic["MPI"] = opt_value
+        if opt_name == '-n' or opt_name == '--ntasks':
+            option_dic["SLURM_NTASKS"] = opt_value
+        if opt_name == '-o' or opt_name == '--output':
+            option_dic["SBATCH_OUTPUT"] = opt_value
+        if opt_name == '--open-mode':
+            option_dic["SBATCH_OPEN_MODE"] = opt_value
+        if opt_name == '-p' or opt_name == '--partition':
+            option_dic["SBATCH_PARTITION"] = opt_value
+        if opt_name == '--priority':
+            option_dic["PRIORITY"] = opt_value
+        if opt_name == '-t' or opt_name == '--time':
+            option_dic["SBATCH_TIMELIMIT"] = opt_value
+        if opt_name == '--exclusive':
+            option_dic["SBATCH_EXCLUSIVE"] = opt_value
+        if opt_name == '--gpus-per-task':
+            option_dic["SBATCH_GPUS_PER_TASK"] = opt_value
+        if opt_name == '-w' or opt_name == '--nodelist':
+            option_dic["SBATCH_NODELIST"] = opt_value
+        if opt_name == '-x' or opt_name == '--exclude':
+            option_dic["SBATCH_EXCLUDE"] = opt_value
+        if opt_name == '-N' or opt_name == '--nodes':
+            option_dic["SBATCH_NODES"] = opt_value
+        if opt_name == '--ntasks-per-node':
+            option_dic["SBATCH_NTASKS_PER_NODE"] = opt_value
+
+
+def handle_script_file(file_name, short_options, long_options):
+    global option_dic
+    if file_name == []:
+        return
+    else:
+        #check if it is a script file
+        if not str(file_name[0]).endswith(".sh"):
+            if os.path.exists(file_name[0]):
+                error_info = '''sbatch: error: This does not look like a batch script.  
+sbatch: error: The first line must start with #! followed by the path to an interpreter.
+sbatch: error: For instance: #!/bin/sh'''
+                print(error_info)
+                log(error_info)
+            else:
+                print('sbatch: error: Unable to open file ' + file_name[0])
+                log('sbatch: error: Unable to open file ' + file_name[0])
+            sys.exit()
+        try:
+            with open(file_name[0], 'r') as f:
+                lines = f.readlines()
+                first_line = 0
+                for i in range(len(lines)):
+                    if lines[i] != '\n':
+                        first_line = i
+                        break
+                if not lines[first_line].startswith('#!'):
+                    error_info = '''sbatch: error: This does not look like a batch script.  
+sbatch: error: The first line must start with #! followed by the path to an interpreter.
+sbatch: error: For instance: #!/bin/sh'''
+                    print(error_info)
+                    log(error_info)
+                    sys.exit()
+                mpirun_num = 0
+                for j in range(first_line + 1, len(lines)):
+                    #srun is not supported in scripts
+                    if 'srun' in lines[j].strip().split():
+                        print('sbatch: error: Not support srun command, replace it with normal command.')
+                        log('sbatch: error: Not support srun command, replace it with normal command.')
+                        sys.exit()
+                    #Multiple mpirun commands are not supported in scripts
+                    if 'mpirun' in lines[j].strip().split():
+                        mpirun_num += 1
+                        if mpirun_num > 1:
+                            print('sbatch: error: Not support multiple mpirun.')
+                            log('sbatch: error: Not support multiple mpirun.')
+                            sys.exit()
+                    #'#'and 'SBATCH' cannot be preceded by blank characters
+                    if lines[j].strip().startswith('#SBATCH') and len(lines[j].strip()) > 8:
+                        options, cmd = getopt.getopt(lines[j].strip()[8:].split(), short_options, long_options)
+                        #handle_parameter_exception(opts)
+                        update_dict(options)
+
+        except IOError:
+            print("sbatch: error: File is not found")
+            log("sbatch: error: File is not found")
+            exit()
+
+
+def handle_mpirun_task(file_name):
+    global option_dic
+    if file_name == []:
+        return
+    else:
+        if not str(file_name[0]).endswith(".sh"):
+            if os.path.exists(file_name[0]):
+                error_info = '''sbatch: error: This does not look like a batch script.  
+sbatch: error: The first line must start with #! followed by the path to an interpreter.
+sbatch: error: For instance: #!/bin/sh'''
+                print(error_info)
+                log(error_info)
+            else:
+                print('sbatch: error: Unable to open file ' + file_name[0])
+                log('sbatch: error: Unable to open file ' + file_name[0])
+            sys.exit()
+        try:
+            with open(file_name[0], 'r') as f:
+                lines = f.readlines()
+                first_line = 0
+                for i in range(len(lines)):
+                    if lines[i] != '\n':
+                        first_line = i
+                        break
+                if not lines[first_line].startswith('#!'):
+                    error_info = '''sbatch: error: This does not look like a batch script.  
+sbatch: error: The first line must start with #! followed by the path to an interpreter.
+sbatch: error: For instance: #!/bin/sh'''
+                    print(error_info)
+                    log(error_info)
+                    sys.exit()
+                for j in range(first_line + 1, len(lines)):
+                    #mpi job only supports cosched job types
+                    #the parameters of '$CCS_MPI_OPTIONS' and 'MPI' need to be added
+                    if 'mpirun' in lines[j].strip().split():
+                        if '$CCS_MPI_OPTIONS' not in lines[j].strip().split() and "MPI" not in option_dic:
+                            error_info = '''sbatch: error: Need to add mpi option $CCS_MPI_OPTIONS in front of the user_command
+sbatch: error: example: mpirun [other_mpi_options] $CCS_MPI_OPTIONS <user_cmd>
+sbatch: error: Need to add sbatch options “--mpi" to specify mpi type'''
+                            print(error_info)
+                            log(error_info)
+                            sys.exit()
+                        elif '$CCS_MPI_OPTIONS' not in lines[j].strip().split():
+                            error_info = '''sbatch: error: Need to add mpi option $CCS_MPI_OPTIONS in front of the user_command
+sbatch: error: example: mpirun [other_mpi_options] $CCS_MPI_OPTIONS <user_cmd>'''
+                            print(error_info)
+                            log(error_info)
+                            sys.exit()
+                        elif "MPI" not in option_dic:
+                            print('sbatch: error: Need to add sbatch options “--mpi" to specify mpi type')
+                            log('sbatch: error: Need to add sbatch options “--mpi" to specify mpi type')
+                            sys.exit()
+
+        except IOError:
+            print("sbatch: error: File is not found")
+            log("sbatch: error: File is not found")
+            exit()
+
+
+def handle_parameter_exception():
+    global option_dic
+    for opt_name, opt_value in option_dic.items():
+        if opt_name == 'BEGIN':
+            if not opt_value or opt_value.endswith('.sh'):
+                error_info = '''sbatch: option "--begin" requires an argument
+Try 'sbatch --help' for more info'''
+                print(error_info)
+                log(error_info)
+                sys.exit()
+            if not begintime_is_match(opt_value):
+                error_info = 'Invalid time specification:' + opt_value + '\n' + \
+                             'sbatch: error: Invalid --begin specification'
+                print(error_info)
+                log(error_info)
+                sys.exit()
+        elif opt_name == 'SBATCH_CPUS_PER_TASK':
+            if not opt_value.isdigit():
+                print('sbatch: error: Invalid numeric value "' + opt_value + '" for --cpus-per-task.')
+                log('sbatch: error: Invalid numeric value "' + opt_value + '" for --cpus-per-task.')
+                sys.exit()
+        elif opt_name == 'COMMENT':
+            if not opt_value or opt_value.endswith('.sh'):
+                error_info = '''sbatch: option "--comment" requires an argument
+Try 'sbatch --help' for more info'''
+                print(error_info)
+                log(error_info)
+                sys.exit()
+        elif opt_name == 'SLURM_DEPENDENCY':
+            if not opt_value or opt_value.endswith('.sh'):
+                error_info = '''sbatch: option "--dependency" requires an argument
+Try 'sbatch --help' for more info'''
+                print(error_info)
+                log(error_info)
+                sys.exit()
+            elif not match_dependency(opt_value):
+                print('sbatch: error: Batch job submission failed: Job dependency problem')
+                log('sbatch: error: Batch job submission failed: Job dependency problem')
+                sys.exit()
+        elif opt_name == 'SLURM_WORKING_DIR':
+            if not opt_value or opt_value.endswith('.sh'):
+                error_info = '''sbatch: option "--chdir" requires an argument
+Try 'sbatch --help' for more info'''
+                print(error_info)
+                log(error_info)
+                sys.exit()
+        elif opt_name == 'SBATCH_EXPORT':
+            if not opt_value or opt_value.endswith('.sh'):
+                error_info = '''sbatch: option "--export" requires an argument
+Try 'sbatch --help' for more info'''
+                print(error_info)
+                log(error_info)
+                sys.exit()
+        elif opt_name == 'SBATCH_ERROR':
+            if not opt_value or opt_value.endswith('.sh'):
+                print('''sbatch: option "--error" requires an argument
+Try 'sbatch --help' for more info''')
+                log('''sbatch: option "--error" requires an argument
+Try 'sbatch --help' for more info''')
+                sys.exit()
+        elif opt_name == 'GID':
+            if not opt_value.isdigit():
+                print('sbatch: error: Invalid numeric value "' + opt_value + '" for --gid.')
+                log('sbatch: error: Invalid numeric value "' + opt_value + '" for --gid.')
+                sys.exit()
+        elif opt_name == 'SBATCH_JOB_NAME':
+            if not opt_value or opt_value.endswith('.sh'):
+                print('''sbatch: option "--job-name" requires an argument
+Try 'sbatch --help' for more info''')
+                log('''sbatch: option "--job-name" requires an argument
+Try 'sbatch --help' for more info''')
+                sys.exit()
+        elif opt_name == 'MPI':
+            if opt_value not in ['hmpi', 'openmpi', 'intelmpi', 'mpich']:
+                print('sbatch:error: illegal cosched job type format, supported: hmpi, openmpi, intelmpi, mpich')
+                log('sbatch:error: illegal cosched job type format, supported: hmpi, openmpi, intelmpi, mpich')
+                sys.exit()
+        elif opt_name == 'SLURM_NTASKS':
+            if not opt_value.isdigit():
+                print('sbatch: error: Invalid numeric value "' + opt_value + '" for --ntasks.')
+                log('sbatch: error: Invalid numeric value "' + opt_value + '" for --ntasks.')
+                sys.exit()
+        elif opt_name == 'SBATCH_OUTPUT':
+            if not opt_value or opt_value.endswith('.sh'):
+                print('''sbatch: option "--output" requires an argument
+Try 'sbatch --help' for more info''')
+                log('''sbatch: option "--output" requires an argument
+Try 'sbatch --help' for more info''')
+                sys.exit()
+        elif opt_name == 'SBATCH_OPEN_MODE':
+            if not opt_value or opt_value.endswith('.sh'):
+                print('''sbatch: option "--open-mode" requires an argument
+Try 'sbatch --help' for more info''')
+                log('''sbatch: option "--open-mode" requires an argument
+Try 'sbatch --help' for more info''')
+                sys.exit()
+        elif opt_name == 'SBATCH_PARTITION':
+            if not opt_value or opt_value.endswith('.sh'):
+                print('''sbatch: option "--partition" requires an argument
+Try 'sbatch --help' for more info''')
+                log('''sbatch: option "--partition" requires an argument
+Try 'sbatch --help' for more info''')
+                sys.exit()
+        elif opt_name == 'PRIORITY':
+            if not opt_value.isdigit() or int(opt_value) < 1 or int(opt_value) > 9999:
+                print('sbatch: error: Invalid numeric value "' + opt_value + '" for --priority.')
+                log('sbatch: error: Invalid numeric value "' + opt_value + '" for --priority.')
+                sys.exit()
+        elif opt_name == 'SBATCH_TIMELIMIT':
+            if not time_is_match(opt_value):
+                print('sbatch: error: Invalid --time specification')
+                log('sbatch: error: Invalid --time specification')
+                sys.exit()
+        elif opt_name == 'SBATCH_EXCLUSIVE':
+            pass
+        elif opt_name == 'SBATCH_GPUS_PER_TASK':
+            if not opt_value.isdigit():
+                print('sbatch: error: Invalid numeric value "' + opt_value + '" for --gpus-per-task.')
+                log('sbatch: error: Invalid numeric value "' + opt_value + '" for --gpus-per-task.')
+                sys.exit()
+        elif opt_name == 'SBATCH_NODELIST':
+            if not opt_value or opt_value.endswith('.sh'):
+                print('''sbatch: option "--nodelist" requires an argument
+Try 'sbatch --help' for more info''')
+                log('''sbatch: option "--nodelist" requires an argument
+Try 'sbatch --help' for more info''')
+                sys.exit()
+        elif opt_name == 'SBATCH_EXCLUDE':
+            if not opt_value or opt_value.endswith('.sh'):
+                print('''sbatch: option "--exclude" requires an argument
+Try 'sbatch --help' for more info''')
+                log('''sbatch: option "--exclude" requires an argument
+Try 'sbatch --help' for more info''')
+                sys.exit()
+        elif opt_name == 'SBATCH_NODES':
+            if not opt_value.isdigit():
+                print('sbatch: error: "'+ opt_value+'" is not a valid node count')
+                log('sbatch: error: "'+ opt_value+'" is not a valid node count')
+                sys.exit()
+        elif opt_name == 'SBATCH_NTASKS_PER_NODE':
+            if not opt_value.isdigit():
+                print('sbatch: error: Invalid numeric value "' + opt_value + '" for --ntasks-per-node.')
+                log('sbatch: error: Invalid numeric value "' + opt_value + '" for --ntasks-per-node.')
+                sys.exit()
+
+
+def log(content):
+    global is_debug
+    global log_file
+    if is_debug:
+        f = open(log_file, 'a+')
+        f.write(content + '\n')
+        f.close()
+
+
+def init_log_file_name():
+    global log_file
+    file_name = '%s.%d.%d' % ('sbatch', os.getuid(), os.getpid())
+    log_file = os.path.join('/tmp/', file_name)
+
+    
+# init options from environment
+def init_config_with_env():
+    global is_debug
+    global option_dic
+    debug_env = os.getenv('SLURM_TO_DONAU_DEBUG')
+    if debug_env is not None and debug_env.lower() == 'true':
+        is_debug = True
+        init_log_file_name()
+    else:
+        is_debug = False
+    if os.environ.get("SBATCH_EXPORT") is not None:
+        option_dic["SBATCH_EXPORT"] = os.environ.get("SBATCH_EXPORT")
+    if os.environ.get("SBATCH_ERROR") is not None:
+        option_dic["SBATCH_ERROR"] = os.environ.get("SBATCH_ERROR")
+    if os.environ.get("SBATCH_JOB_NAME") is not None:
+        option_dic["SBATCH_JOB_NAME"] = os.environ.get("SBATCH_JOB_NAME")
+    if os.environ.get("SBATCH_OUTPUT") is not None:
+        option_dic["SBATCH_OUTPUT"] = os.environ.get("SBATCH_OUTPUT")
+    if os.environ.get("SBATCH_OPEN_MODE") is not None:
+        option_dic["SBATCH_OPEN_MODE"] = os.environ.get("SBATCH_OPEN_MODE")
+    if os.environ.get("SBATCH_PARTITION") is not None:
+        option_dic["SBATCH_PARTITION"] = os.environ.get("SBATCH_PARTITION")
+    if os.environ.get("SBATCH_TIMELIMIT") is not None:
+        option_dic["SBATCH_TIMELIMIT"] = os.environ.get("SBATCH_TIMELIMIT")
+    if os.environ.get("SBATCH_GPUS_PER_TASK") is not None:
+        option_dic["SBATCH_GPUS_PER_TASK"] = os.environ.get("SBATCH_GPUS_PER_TASK")
+
+
+def check_donau_cli_env():
+    sched_cli_home = os.getenv('CCSCHEDULER_CLI_HOME')
+    ccs_cli_home = os.getenv('CCS_CLI_HOME')
+    ca_cert_perm = os.getenv('CURL_CA_BUNDLE')
+    if sched_cli_home is None or ccs_cli_home is None or ca_cert_perm is None:
+        print('cli env home is not configured, '
+              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
+        sys.exit(1)
+    if ca_cert_perm is None:
+        print('cli ca_cert_perm is not specified,'
+              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
+        sys.exit(1)
+    global djob_path
+    djob_path = os.path.join(ccs_cli_home, 'bin', 'djob')
+    if not os.path.exists(djob_path):
+        print('djob path is not exist,'
+              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
+        sys.exit(1)
+
+
+def get_help_info():
+    help_info = '''Usage: sbatch [OPTIONS(0)...] [ : [OPTIONS(N)...]] script(0) [args(0)...]
+
+Parallel run options:
+ -b, --begin=time                   defer job until HH:MM MM/DD/YY
+ -c, --cpus-per-task=ncpus          number of cpus required per task
+     --comment=name                 arbitrary comment
+ -d, --dependency=type:jobid        defer job until condition on jobid is satisfied
+ -D, --chdir=directory              set working directory for batch script
+ -e, --error=err                    file for batch script's standard error
+     --export[=names]               specify environment variables to export
+     --gid=group_id                 group ID to run job as (user root only)
+ -J, --job-name=jobname             name of job
+     --mpi=mpi_type                 type of mpi job
+ -n, --ntasks=ntasks                number of tasks to run
+     --ntasks-per-node=n            number of tasks to invoke on each node
+ -N, --nodes=N                      number of nodes on which to run (N = min[-max])
+ -o, --output=out                   file for batch script's standard output
+     --open-mode={append|truncate}  mode of open the output and error files
+ -p, --partition=partition          partition requested
+     --priority=value               set the priority of the job to value
+ -t, --time=minutes                 time limit
+Constraint options:
+ -w, --nodelist=hosts...            request a specific list of hosts
+ -x, --exclude=hosts...             exclude a specific list of hosts
+Consumable resources related options:
+ --exclusive                        allocate nodes in exclusive mode when
+                                    cpu consumable resource is enabled
+GPU scheduling options:
+ --gpus-per-task=n                  number of GPUs required per spawned task
+Help options:
+ --help                             show this help message
+ --usage                            display brief usage message'''
+    return help_info
+
+
+def get_usage_info():
+    usage_info = '''Usage: [-N nnodes] [-n ntasks] [-b "HH:MM MM/DD/YY"]
+       [-c ncpus] [-p partition] [-e err] [--time=minutes]
+       [-D path] [--mpi mpi_type] [--output file]
+       [--open-mode={append|truncate}] [--error file] 
+       [--priority=value] [--chdir=directory] [-J jobname] 
+       [--gid=group] [--dependency=type:jobid] [--comment=name]
+       [--ntasks-per-node=n] [--nodelist=hosts][--exclude=hosts] 
+       [--export[=names]] [--exclusive] [--gpus-per-task=n]
+       executable [args...]'''
+    return usage_info
+
+
+if __name__ == '__main__':
+    if os.getuid() == 0:
+        print('Permission denied. The root user is not allowed to operate.')
+        log('Permission denied. The root user is not allowed to operate.')
+        sys.exit(1)
+    check_donau_cli_env()
+    init_config_with_env()
+    short_options = '-b:-c:-d:-D:-e:-J:-n:-o:-p:-t:-w:-x:-N:'
+    long_options = ['begin=', 'cpus-per-task=', 'comment=', 'dependency=', 'chdir=', 'export=',
+                    'error=', 'gid=', 'job-name=', 'mpi=', 'ntasks=', 'output=', 'open-mode=',
+                    'partition=', 'priority=', 'time=', 'exclusive', 'gpus-per-task=', 'nodelist=',
+                    'exclude=', 'nodes=', 'ntasks-per-node=', 'usage', 'help']
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], short_options, long_options)
+        # options from script file have higher priority than environment
+        handle_script_file(args, short_options, long_options)
+        # options from command have higher priority than script file and environment
+        update_dict(opts)
+        if "HELP" in option_dic:
+            print(get_help_info())
+            log(get_help_info())
+            sys.exit()
+        if "USAGE" in option_dic:
+            print(get_usage_info())
+            log(get_usage_info())
+            sys.exit()
+        handle_parameter_exception()
+        handle_mpirun_task(args)
+        donau_command += "dsub "
+        output_mode = False
+        if "SBATCH_OPEN_MODE" in option_dic and option_dic["SBATCH_OPEN_MODE"] == 'append':
+            output_mode = True
+        if "COMMENT" in option_dic:
+            donau_command += '-d "' + option_dic["COMMENT"] + '" '
+        if "SLURM_DEPENDENCY" in option_dic:
+            donau_command += '-D ' + split_dependency(option_dic["SLURM_DEPENDENCY"]) + ' '
+        if "SLURM_WORKING_DIR" in option_dic:
+            donau_command += '-EP ' + '"' + option_dic["SLURM_WORKING_DIR"] + '" '
+        if "SBATCH_EXPORT" in option_dic:
+            donau_command += '-x ' + '"' + option_dic["SBATCH_EXPORT"] + '" '
+        if "SBATCH_ERROR" in option_dic:
+            if output_mode:
+                donau_command += '-e ' + '"' + option_dic["SBATCH_ERROR"] + '" '
+            else:
+                donau_command += '-eo ' + '"' + option_dic["SBATCH_ERROR"] + '" '
+        if "GID" in option_dic and option_dic["GID"].isdigit():
+            donau_command += '-ug ' + option_dic["GID"] + ' '
+        if "MPI" in option_dic:
+            if option_dic["MPI"] in ['hmpi', 'openmpi', 'intelmpi', 'mpich']:
+                donau_command += '--job_type cosched:' + option_dic["MPI"] + ' '
+            else:
+                print('sbatch:error: illegal cosched job type format, supported: hmpi, openmpi, intelmpi, mpich')
+                log('sbatch:error: illegal cosched job type format, supported: hmpi, openmpi, intelmpi, mpich')
+                sys.exit()
+        if "SBATCH_JOB_NAME" in option_dic:
+            donau_command += '--name ' + '"' + option_dic["SBATCH_JOB_NAME"] + '" '
+        if "SLURM_NTASKS" in option_dic:
+            donau_command += '-N ' + option_dic["SLURM_NTASKS"] + ' '
+        if "SBATCH_OUTPUT" in option_dic:
+            if output_mode:
+                donau_command += '-o ' + '"' + option_dic["SBATCH_OUTPUT"] + '" '
+            else:
+                donau_command += '-oo ' + '"' + option_dic["SBATCH_OUTPUT"] + '" '
+        if "SBATCH_PARTITION" in option_dic:
+            donau_command += '-q ' + '"' + option_dic["SBATCH_PARTITION"] + '" '
+        if "PRIORITY" in option_dic:
+            donau_command += '-p ' + option_dic["PRIORITY"] + ' '
+        if "SBATCH_TIMELIMIT" in option_dic:
+            donau_command += '-T "' + convert_timeout(option_dic["SBATCH_TIMELIMIT"]) + '" '
+        if "SBATCH_EXCLUSIVE" in option_dic:
+            donau_command += '-ex ' + 'job' + ' '
+        if "SBATCH_CPUS_PER_TASK" in option_dic and "SBATCH_GPUS_PER_TASK" in option_dic:
+            if not option_dic["SBATCH_CPUS_PER_TASK"].isdigit() and not option_dic["SBATCH_GPUS_PER_TASK"].isdigit():
+                error_info = 'sbatch: error: Invalid numeric value + "' + option_dic["SBATCH_CPUS_PER_TASK"] + '" for --cpus-per-task and \
+    Invalid numeric value "' + option_dic["SBATCH_GPUS_PER_TASK"] + '" for --gpus-per-task.'
+                print(error_info)
+                log(error_info)
+                sys.exit()
+            elif not option_dic["SBATCH_CPUS_PER_TASK"].isdigit():
+                print('sbatch: error: Invalid numeric value "' + option_dic[
+                    "SBATCH_CPUS_PER_TASK"] + '" for --cpus-per-task.')
+                log('sbatch: error: Invalid numeric value "' + option_dic[
+                    "SBATCH_CPUS_PER_TASK"] + '" for --cpus-per-task.')
+                sys.exit()
+            elif not option_dic["SBATCH_GPUS_PER_TASK"].isdigit():
+                print('sbatch: error: Invalid numeric value "' + option_dic[
+                    "SBATCH_GPUS_PER_TASK"] + '" for --gpus-per-task.')
+                log('sbatch: error: Invalid numeric value "' + option_dic[
+                    "SBATCH_GPUS_PER_TASK"] + '" for --gpus-per-task.')
+                sys.exit()
+            else:
+                donau_command += '-R "cpu=' + str(option_dic["SBATCH_CPUS_PER_TASK"]) + ";gpu=" + str(
+                    option_dic["SBATCH_GPUS_PER_TASK"]) + '" '
+        elif "SBATCH_CPUS_PER_TASK" in option_dic:
+            if not option_dic["SBATCH_CPUS_PER_TASK"].isdigit():
+                print('sbatch: error: Invalid numeric value "' + option_dic[
+                    "SBATCH_CPUS_PER_TASK"] + '" for --cpus-per-task.')
+                log('sbatch: error: Invalid numeric value "' + option_dic[
+                    "SBATCH_CPUS_PER_TASK"] + '" for --cpus-per-task.')
+                sys.exit()
+            else:
+                donau_command += '-R "cpu=' + str(option_dic["SBATCH_CPUS_PER_TASK"]) + '" '
+        elif "SBATCH_GPUS_PER_TASK" in option_dic:
+            if not option_dic["SBATCH_GPUS_PER_TASK"].isdigit():
+                print('sbatch: error: Invalid numeric value "' + option_dic[
+                    "SBATCH_GPUS_PER_TASK"] + '" for --gpus-per-task.')
+                log('sbatch: error: Invalid numeric value "' + option_dic[
+                    "SBATCH_GPUS_PER_TASK"] + '" for --gpus-per-task.')
+                sys.exit()
+            else:
+                donau_command += '-R "gpu=' + str(option_dic["SBATCH_GPUS_PER_TASK"]) + '" '
+        if "SBATCH_NODELIST" in option_dic and "SBATCH_EXCLUDE" in option_dic:
+            pattern1 = re.compile(".+\[\d+-\d+(,\d)*\]")
+            pattern2 = re.compile("[A-Za-z@_0-9-.]+(,[A-Za-z@_0-9-.]*)*")
+            m_node1 = pattern1.match(option_dic["SBATCH_NODELIST"])
+            m_exclude1 = pattern1.match(option_dic["SBATCH_EXCLUDE"])
+            m_node2 = pattern2.match(option_dic["SBATCH_NODELIST"])
+            m_exclude2 = pattern2.match(option_dic["SBATCH_EXCLUDE"])
+            if m_node1 and m_node1.group(0) == option_dic["SBATCH_NODELIST"] and m_exclude1 and m_exclude1.group(0) == \
+                    option_dic[
+                        "SBATCH_EXCLUDE"]:
+                donau_command += "-pn '" + str(option_dic["SBATCH_NODELIST"]) + " !" + str(
+                    option_dic["SBATCH_EXCLUDE"]) + "' "
+            elif m_node1 and m_node1.group(0) == option_dic["SBATCH_NODELIST"] and m_exclude2 and m_exclude2.group(0) == \
+                    option_dic[
+                        "SBATCH_EXCLUDE"]:
+                donau_command += "-pn '" + str(option_dic["SBATCH_NODELIST"]) + " "
+                for item in str(option_dic["SBATCH_EXCLUDE"]).strip().split(','):
+                    if item:
+                        donau_command += '!' + item + ' '
+                donau_command += "' "
+            elif m_node2 and m_node2.group(0) == option_dic["SBATCH_NODELIST"] and m_exclude1 and m_exclude1.group(0) == \
+                    option_dic[
+                        "SBATCH_EXCLUDE"]:
+                donau_command += "-pn '" + str(option_dic["SBATCH_NODELIST"]).replace(',', ' ')
+                donau_command += " !" + str(option_dic["SBATCH_EXCLUDE"]) + "' "
+            elif m_node2 and m_node2.group(0) == option_dic["SBATCH_NODELIST"] and m_exclude2 and m_exclude2.group(0) == \
+                    option_dic[
+                        "SBATCH_EXCLUDE"]:
+                donau_command += "-pn '" + str(option_dic["SBATCH_NODELIST"]).replace(',', ' ')
+                donau_command += ' '
+                for item in str(option_dic["SBATCH_EXCLUDE"]).strip().split(','):
+                    if item:
+                        donau_command += '!' + item + ' '
+                donau_command += "' "
+            else:
+                donau_command += "-pn '" + str(option_dic["SBATCH_NODELIST"]) + " !" + str(
+                    option_dic["SBATCH_EXCLUDE"]) + "' "
+        elif "SBATCH_NODELIST" in option_dic:
+            pattern1 = re.compile(".+\[\d+-\d+(,\d)*\]")
+            m1 = pattern1.match(option_dic["SBATCH_NODELIST"])
+            pattern2 = re.compile("[A-Za-z@_0-9-.]+(,[A-Za-z@_0-9-.]*)*")
+            m2 = pattern2.match(option_dic["SBATCH_NODELIST"])
+            if m1 and m1.group(0) == option_dic["SBATCH_NODELIST"]:
+                donau_command += "-pn '" + str(option_dic["SBATCH_NODELIST"]) + "' "
+            elif m2 and m2.group(0) == option_dic["SBATCH_NODELIST"]:
+                donau_command += "-pn '" + str(option_dic["SBATCH_NODELIST"]).replace(',', ' ') + "' "
+        elif "SBATCH_EXCLUDE" in option_dic:
+            pattern1 = re.compile(".+\[\d+-\d+(,\d)*\]")
+            m1 = pattern1.match(option_dic["SBATCH_EXCLUDE"])
+            pattern2 = re.compile("[A-Za-z@_0-9-.]+(,[A-Za-z@_0-9-.]*)*")
+            m2 = pattern2.match(option_dic["SBATCH_EXCLUDE"])
+            if m1 and m1.group(0) == option_dic["SBATCH_EXCLUDE"]:
+                donau_command += "-pn '!" + str(option_dic["SBATCH_EXCLUDE"]) + "' "
+            elif m2 and m2.group(0) == option_dic["SBATCH_EXCLUDE"]:
+                donau_command += "-pn '"
+                for item in str(option_dic["SBATCH_EXCLUDE"]).strip().split(','):
+                    if item:
+                        donau_command += '!' + item + ' '
+                donau_command += "' "
+        if "SBATCH_NODES" in option_dic:
+            donau_command += '-nn ' + option_dic["SBATCH_NODES"]
+            donau_command += ' '
+        if "SBATCH_NTASKS_PER_NODE" in option_dic:
+            donau_command += '-tpn ' + option_dic["SBATCH_NTASKS_PER_NODE"]
+            donau_command += ' '
+        if "BEGIN" in option_dic:
+            donau_command += '-S "'
+            donau_command += time_format(option_dic["BEGIN"]) + '" '
+        if args == []:
+            error_info = '''sbatch:fatal:No batch script to execute.
+    Try "sbatch --help" for more information'''
+            print(error_info)
+            log(error_info)
+            sys.exit()
+        else:
+            donau_command += '-s'
+            for item in args:
+                donau_command += " " + item
+            log(donau_command)
+            process = subprocess.Popen(donau_command, shell=True, stdout=subprocess.PIPE, bufsize=1)
+            process.wait()
+            retcode = process.returncode
+            if retcode == 0:
+                jobid = 0
+                for item in iter(process.stdout.readline, b''):
+                    itemstr = item.decode().replace('\n', '')
+                    itemlist = itemstr.strip().split(' ')
+                    if itemlist[0].isdigit():
+                        jobid = int(itemlist[0])
+                if jobid >= 0:
+                    print('Submitted batch job ' + str(jobid))
+                    log('Submitted batch job ' + str(jobid))
+            else:
+                for item in iter(process.stdout.readline, b''):
+                    content = item.decode().replace('\n', '')
+                    if content.startswith('JOBID'):
+                        pass
+                    elif len(content) > 1 and content.startswith('-'):
+                        print(content[1:].strip())
+                        log(content[1:].strip())
+                    else:
+                        print(content.strip())
+                        log(content.strip())
+    except getopt.GetoptError as err:
+        invalid_option = get_invalid_option(str(err))
+        print_invalid_info(invalid_option)
+        sys.exit()
+    except:
+        sys.exit()
+
