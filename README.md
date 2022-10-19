@@ -118,21 +118,19 @@ RUNNING, PENDING/WAITING, STOPPED。显示结果中"NODELIST(REASON)"的未调�
 举例:
 
     
-    $squeue
+    $squeue 
     JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
-      519   root.q1  default  test_st  R       0:20      1 kwephicprd18119
       520   root.q1  default  test_st PD       0:00      - 20615
       521   root.q1  default  test_st PD       0:00      - 10101
-      522   root.q1  default  test_st  S       0:00      1 kwephicprd18119
+      522   root.q1  default  test_st  S   11:28:42      1 kwephicprd18119
     
    
     $squeue -l
-    Tue Oct 18 22:02:43 2022
-    JOBID PARTITION     NAME     USER    STATE       TIME TIME_LIMI   NODES NODELIST(REASON)
-      519   root.q1  default  test_st  RUNNING       2:00 UNLIMITED       1  kwephicprd18119
-      520   root.q1  default  test_st  PENDING       0:00 UNLIMITED       -            20615
-      521   root.q1  default  test_st  PENDING       0:00 UNLIMITED       -            10101
-      522   root.q1  default  test_st SUSPENDE       1:40 UNLIMITED       1  kwephicprd18119
+    Wed Oct 19 09:30:34 2022
+        JOBID PARTITION     NAME     USER    STATE       TIME TIME_LIMI   NODES NODELIST(REASON)
+          520   root.q1  default  test_st  PENDING       0:00 UNLIMITED       -            20615
+          521   root.q1  default  test_st  PENDING       0:00 UNLIMITED       -            10101
+          522   root.q1  default  test_st SUSPENDE   11:29:22 UNLIMITED       1  kwephicprd18119
 
 4.  scancel命令
     scancel支持终止未完成的作业，对应的DONAU命令为djob -T, 执行scancel后的作业状态为CANCELLED。
