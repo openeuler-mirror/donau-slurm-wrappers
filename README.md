@@ -71,8 +71,8 @@ $CCS_MPI_OPTIONS。
                 executable [args...]
                 
 普通作业举例:
-   脚本
    
+    #脚本文件  
     $cat hello.sh
     #!/bin/sh
     #SBATCH --comment test_job
@@ -91,8 +91,8 @@ $CCS_MPI_OPTIONS。
     
 
 MPI作业举例:
-    脚本
     
+    #脚本文件    
     $cat mpi_job.sh 
     #! /bin/sh
     #SBATCH -o /tmp/%j.txt         #重定向输出
