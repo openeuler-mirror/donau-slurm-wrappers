@@ -18,7 +18,7 @@ python2/python3
 
 #### 安装教程
 
-1.  从网址https://gitee.com/openeuler/donau-slurm-wrappers下载最新的脚本
+1.  从网址https://gitee.com/openeuler/donau-slurm-wrappers 下载最新的脚本
 2.  更改脚本的属主为DONAU的CLI用户, 修改权限为555， 例如当前用户为ccs_cli，则执行
     
      
@@ -207,7 +207,7 @@ RUNNING, PENDING/WAITING, STOPPED。显示结果中"NODELIST(REASON)"的未调�
     519             RUNNING      0:0
     524           COMPLETED      0:0
     
-#### 注释事项
+#### 注意事项
 
 一. donau-slurm-wrappers是对donau的一些cli命令的二次封装，命令的执行依赖于cli本身的规则。脚本不支持root用户
 调用, 同时在实际使用中可能会遇到token校验失败的问题。常见的token失败场景如下：
