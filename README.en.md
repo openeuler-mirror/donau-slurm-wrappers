@@ -1,7 +1,7 @@
 # donau-slurm-wrappers
 
 #### Description
-Donau-slurm-wrappers provide some scripts with for Slurm users to get start with Donau Scheduler quickly.
+Donau-slurm-wrappers provide some scripts for Slurm users to get start with Donau Scheduler quickly.
 These scripts with slurm command syntax and options execute Donau-CLI commands in the background.
 
 Commands include:
@@ -25,7 +25,7 @@ For example, if the current user is ccs_cli, run the following command:
 
 #### Instructions
 
-1.  srun
+1.srun  
     The srun is used to submit a blocking job. Job will be regarded as a Donau block job which submitted by 
 "dsub -Kco". If option "--pty" is specified, job will be regarded as Donau interactive job submitted by
 "dsub -I". Users must configure queues to support interactive jobs refer to "HPC Product Documentation". Then
@@ -51,7 +51,7 @@ converts to Donau-command
 
     dsub –Kco -N 1 -S "2022/11/09 17:18:00" --name "job_name" -T "3h20m" -R "cpu=2"  user_command
 
-2.  sbatch
+2.sbatch  
     The sbatch is used to submit a batch script. The command will be converted to "dsub -s". You are advised
 to place the script in the shared directory. Users should specify MPI type by option "--mpi" (additional option
 to specify mpi type to run Donau mpi job) and add environment variables "$CCS_MPI_OPTIONS" to user-command in
@@ -103,7 +103,7 @@ Example of openmpi job:
    
     $sbatch --mpi openmpi mpi_job.sh
     
-3.  squeue
+3.squeue  
     The squeue is used to query information about jobs that are not completed. Supported states include
 RUNNING, PENDING and SUSPENDED, the corresponding Donau job states are RUNNING, WAITING/PENDING and STOPPED.
 The value of NODELIST(REASON) in output is replaced by "MAIN_STATE_REASON_CODE" of Donau task. 
@@ -129,7 +129,7 @@ Example:
           521   root.q1  default  test_st  PENDING       0:00 UNLIMITED       -            10101
           522   root.q1  default  test_st SUSPENDE   11:29:22 UNLIMITED       1  kwephicprd18119
 
-4.  scancel
+4.scancel  
     The scancel is used to terminate unfinished jobs. The corresponding Donau command is "djob -T." 
 The job state would be CANCELLED terminated by scancel.
     
@@ -138,7 +138,7 @@ The job state would be CANCELLED terminated by scancel.
     Usage: scancel [-n job_name] [-p partitions]
               [-t PENDING | RUNNING | SUSPENDED] [--usage] [-u user_name] [job_id]
                
-5.  sinfo
+5.sinfo  
     The sinfo is used to query the node and partition information of the current cluster. (Slurm's partition
 does not correspond to Donau's queue. It provides convenient way for users to use Donau' squeue by partition.)  
 
@@ -164,7 +164,7 @@ Example:
     kwephispra23857 1     all       idle 
     kwephicprd18119 1     all       mix
     
-6.  scontrol
+6.scontrol  
     The scontrol command is used to stop/resume jobs, corresponding to "djob -S"/"djob -R" in Donau.
     
     
@@ -172,7 +172,7 @@ Example:
     scontrol: invalid option '--usage'
     Try "scontrol --help" for more information
     
-7.  sacct
+7.sacct  
     The sacct is used to display accounting data for jobs. Supported job states include COMPLETED, FAILED, 
 CANCELLED, RUNNING corresponding to SUCCEEDED, FAILED, RUNNING in Donau.
 
@@ -202,7 +202,7 @@ Example:
     
 #### Precautions
 
-1. Donau-slurm-wrappers are wrappers of some Donau CLI commands. Wrappers execution depends on the rules of 
+1.Donau-slurm-wrappers are wrappers of some Donau CLI commands. Wrappers execution depends on the rules of 
 the Donau CLI. Scripts do not support the root user and token may be verified failed in actual case. 
 Common token errors are as follows:
 
@@ -220,7 +220,7 @@ Common token errors are as follows:
      
      For details about more errors and solutions, see the "HPC Product Documentation".
 
-2. Users can set the environment "SLURM_TO_DONAU_DEBUG" true to enable debug log. If enabled, each script
+2.Users can set the environment "SLURM_TO_DONAU_DEBUG" true to enable debug log. If enabled, each script
 will generate a log file named "script_name.uid.pid" in /tmp directory. Log files are not automatically deleted 
 and need to be manually deleted. 
      
