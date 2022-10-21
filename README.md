@@ -18,7 +18,7 @@ python2/python3
 
 #### 安装教程
 
-1.  从网址https://gitee.com/openeuler/donau-slurm-wrappers下载最新的脚本
+1.  从网址https://gitee.com/openeuler/donau-slurm-wrappers 下载最新的脚本
 2.  更改脚本的属主为DONAU的CLI用户, 修改权限为555， 例如当前用户为ccs_cli，则执行
     
      
@@ -27,7 +27,7 @@ python2/python3
 
 #### 使用说明
 
-1.  srun命令
+1.srun命令  
     srun用于提交阻塞式作业。如果直接使用srun提交作业，会默认转成dsub –Kco提交阻塞式作业，如果srun
  指定--pty，则转换成dsub -I提交交互式作业。对于交互式作业，需要提交到指定队列执行。用户需要参考HPC产品文档，
  配置支持交互式作业的队列。用户通过sinfo查看当前partition，然后使用srun --pty –p指定partition提交交互式作业。
@@ -53,7 +53,7 @@ python2/python3
     
     dsub –Kco -N 1 -S "2022/11/09 17:18:00" --name "job_name" -T "3h20m" -R "cpu=2"  user_command
     
-2.  sbatch命令
+2.sbatch命令  
     sbatch用于提交脚本作业。最终会把命令转换为dsub -s , 建议把执行的脚本放到共享目录。如果是mpi作业，
 需要用--mpi指定mpi类型（目前支持的类型为openmpi, mpich, hmpi, intelmpi), 然后在脚本中的用户命令中增加环境变量
 $CCS_MPI_OPTIONS。
@@ -106,7 +106,7 @@ MPI作业举例:
     $sbatch --mpi openmpi mpi_job.sh
            
                 
-3.  squeue命令 
+3.squeue命令   
     squeue支持查询未完成(RUNNING, PENDING, SUSPENDED)的作业信息，对应的DONAU作业的状态为
 RUNNING, PENDING/WAITING, STOPPED。显示结果中"NODELIST(REASON)"的未调度原因，直接使用DONAU
 中task的"MAIN_STATE_REASON_CODE", 具体原因参考《HPC产品文档》。
@@ -143,7 +143,7 @@ RUNNING, PENDING/WAITING, STOPPED。显示结果中"NODELIST(REASON)"的未调�
     Usage: scancel [-n job_name] [-p partitions]
               [-t PENDING | RUNNING | SUSPENDED] [--usage] [-u user_name] [job_id]
     
-5.  sinfo命令
+5.sinfo命令  
     sinfo用于查询当前集群的节点和分区信息(SLURM的PARTITION和DONAU的QUEUE是两种概念，为了用户对指定QUEUE
 进行操作，将QUEUE和PARTITION对应)。
     
@@ -170,7 +170,7 @@ RUNNING, PENDING/WAITING, STOPPED。显示结果中"NODELIST(REASON)"的未调�
     kwephispra23857 1     all       idle 
     kwephicprd18119 1     all       mix
     
-6.  scontrol命令
+6.scontrol命令  
     scontrol命令用于停止/恢复作业，对应DONAU的djob -S和djob -R。
     
     
@@ -179,7 +179,7 @@ RUNNING, PENDING/WAITING, STOPPED。显示结果中"NODELIST(REASON)"的未调�
     scontrol: invalid option '--usage'
     Try "scontrol --help" for more information
     
-7.  sacct命令
+7.sacct命令  
     sacct查询作业的记账信息，支持查询的作业状态有COMPLETED, FAILED, CANCELLED, RUNNING，对应的DONAU
 作业状态为SUCCEEDED, FAILED, RUNNING)。
 
@@ -207,7 +207,7 @@ RUNNING, PENDING/WAITING, STOPPED。显示结果中"NODELIST(REASON)"的未调�
     519             RUNNING      0:0
     524           COMPLETED      0:0
     
-#### 注释事项
+#### 注意事项
 
 一. donau-slurm-wrappers是对donau的一些cli命令的二次封装，命令的执行依赖于cli本身的规则。脚本不支持root用户
 调用, 同时在实际使用中可能会遇到token校验失败的问题。常见的token失败场景如下：
