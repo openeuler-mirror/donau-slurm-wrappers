@@ -85,7 +85,7 @@ Help options:
 
 
 def get_usage_info():
-    usage_info = '''Usage: sacct [--name] [-S starttime] [-E endtime] [-r partition]
+    usage_info = '''Usage: sacct [--name job_names] [-S starttime] [-E endtime] [-r partition]
               [-s state] [-u user] [-j jobs] [-b]'''
     return usage_info
 
