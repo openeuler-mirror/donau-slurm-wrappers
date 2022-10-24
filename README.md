@@ -80,7 +80,7 @@ $CCS_MPI_OPTIONS。
     #SBATCH -J test_job
     #SBATCH -n 2
     #SBATCH -o /tmp/log.txt
-    #SBATCH -p root. default
+    #SBATCH -p root.default
     #SBATCH -N 2    
     #SBATCH --ntasks-per-node 2
     #SBATCH --open-mode truncate
@@ -139,7 +139,7 @@ RUNNING, PENDING/WAITING, STOPPED。显示结果中"NODELIST(REASON)"的未调�
 
 
     
-    $scancel --usage
+    $scancel --usage  
     Usage: scancel [-n job_name] [-p partitions]
               [-t PENDING | RUNNING | SUSPENDED] [--usage] [-u user_name] [job_id]
     

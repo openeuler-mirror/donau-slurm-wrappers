@@ -20,6 +20,9 @@ output_target_values_list = []
 # donau_cmd_list = {'dnode -L':"-------\nmessage\n", 'dnode -aff':""}
 executed_donau_cmd_dict = {}
 
+# isFromPartition = {'PARTITION', }
+isFromPartition = set()
+
 is_debug = False
 
 def log(content):
@@ -109,6 +112,10 @@ def get_slurm_cmd_opts_hit_map(opts, args):
 def get_output_head_list():
     global output_head_list
     global opts_hit_map
+    global isFromPartition
+    ifp = ['PARTITION', 'AVAIL', 'GROUPS']
+    for item in ifp:
+        isFromPartition.add(item)
     if len(opts_hit_map) is 0:
         output_head_list = ['PARTITION', 'AVAIL', 'TIMELIMIT', 'NODES', 'STATE', 'NODELIST']
         return
@@ -160,16 +167,7 @@ def get_target_value_PARTITION():
         if len(result[index]) == 0:
             continue
         pars.append(result[index].split()[0])
-    cmd = "dnode"
-    if cmd not in executed_donau_cmd_dict.keys():
-        executed_donau_cmd_dict[cmd] = execute_cmd(cmd)
-    result = executed_donau_cmd_dict[cmd]
-    ret = []
-    for index in range(1, len(result)):
-        if len(result[index]) == 0:
-            continue
-        ret.append(",".join(pars))
-    return ret
+    return pars
 
 def get_target_value_NODELIST():
     global executed_donau_cmd_dict
@@ -502,88 +500,98 @@ def select_ret_with_opts(opts):
     global output_target_values_list
     keys = list(opts_hit_map.keys())
     
-    new_ret = [[] for i in range(len(output_head_list))]
-    new_ret_id = []
+    new_ret_rd1 = []
     if 'p' in keys:
         value = opts_hit_map.get('p')
         p_index = output_head_list.index("PARTITION")
-        for i in range(len(output_target_values_list[p_index])):
-            if output_target_values_list[p_index][i] == value:
-                for l in range(len(new_ret)):
-                    new_ret[l].append(output_target_values_list[l][i])
-        output_target_values_list = new_ret
-    
-    new_ret = [[] for i in range(len(output_head_list))]
+        for line in output_target_values_list:
+            if line[p_index] == value:
+                new_ret_rd1.append(line)
+        output_target_values_list = new_ret_rd1
+    new_ret_rd2 = []
     if 'n' in keys:
         value = opts_hit_map['n']
-        p_index = 0
+        n_index = 0
         for i in range(len(output_head_list)):
             if output_head_list[i] == "NODELIST":
-                p_index = i
+                n_index = i
                 break
-        for i in range(len(output_target_values_list[p_index])):
-            if output_target_values_list[p_index][i] == value:
-                for l in range(len(new_ret)):
-                    new_ret[l].append(output_target_values_list[l][i])
-        output_target_values_list = new_ret
+        for line in output_target_values_list:
+            if line[n_index] == value:
+                new_ret_rd2.append(line)
+        output_target_values_list = new_ret_rd2
+    new_ret_rd3 = []
+    if 'N' in keys and len(keys) == 1:
+        vis_node_set = set()
+        for line in output_target_values_list:
+            if line[output_head_list.index('NODELIST')] in vis_node_set:
+                continue
+            vis_node_set.add(line[output_head_list.index('NODELIST')])
+            new_ret_rd3.append(line)
+        output_target_values_list = new_ret_rd3
 
 def extend_with_partirion():
     global output_head_list
-    global opts_hit_map
     global output_target_values_list
+    global opts_hit_map
     keys = list(opts_hit_map.keys())
     if "PARTITION" not in output_head_list:
         return
     if len(output_target_values_list) == 0:
         return
-    new_ret = [[] for i in range(len(output_head_list))]
-    for index in range(len(output_target_values_list[0])):
-        raw_out_line = [output_target_values_list[i][index] for i in range(len(output_head_list))]
-        partition_index = output_head_list.index("PARTITION")
-        # print(raw_out_line)
-        if "p" not in keys and "N" in keys:
-            new_out_line = raw_out_line
-            new_out_line[partition_index] = "all"
-            for i in range(len(output_head_list)):
-                new_ret[i].append(new_out_line[i])
-            continue
-        for single_partition in raw_out_line[partition_index].split(','):
-            new_out_line = raw_out_line
-            new_out_line[partition_index] = single_partition
-            for i in range(len(output_head_list)):
-                new_ret[i].append(new_out_line[i])
+    
+    par_cnt = len(output_target_values_list[output_head_list.index('PARTITION')])
+    node_cnt = 0
+    for item in output_head_list:
+        if item not in isFromPartition:
+            node_cnt = len(output_target_values_list[output_head_list.index(item)])
+    
+    cur_par_index, cur_node_index = 0, 0
+    new_ret = []
+    while cur_par_index < par_cnt and cur_node_index < node_cnt:
+        new_line = []
+        head_index = 0
+        for head in output_head_list:
+            if head in isFromPartition:
+                new_line.append(output_target_values_list[head_index][cur_par_index])
+            else:
+                new_line.append(output_target_values_list[head_index][cur_node_index])
+            head_index += 1
+        new_ret.append(new_line)
+        cur_par_index += 1
+        if cur_par_index == par_cnt:
+            if cur_node_index < node_cnt:
+                cur_par_index = 0
+            cur_node_index += 1
+
     output_target_values_list = new_ret
 
 def print_format():
     global output_target_values_list
     global output_head_list
     global opts_hit_map
-    if len(output_target_values_list) == 0:
-        return
-    
     
     keys = list(opts_hit_map.keys())
     if "l" in keys:
         print_datetime()
     
-    mx_len = [0 for i in range(len(output_head_list))]
+    mx_len = [0 for i in range(len(output_head_list))] 
     for i in range(len(output_head_list)):
         mx_len[i] = max(mx_len[i], len(output_head_list[i]))
-        if len(output_target_values_list[i]) == 0:
-            continue
-        for element in output_target_values_list[i]:
-            mx_len[i] = max(mx_len[i], len(element))
+    for line in output_target_values_list:
+        for i in range(len(line)):
+            mx_len[i] = max(mx_len[i], len(line[i]))
+
     for i in range(len(output_head_list)-1):
         print(output_head_list[i].ljust(mx_len[i]), end=' ')
     print(output_head_list[-1].ljust(mx_len[-1]))
     
-    if len(output_target_values_list[0]) == 0:
-        return
-    for i in range(len(output_target_values_list[0])):
-        out_line = [output_target_values_list[j][i] for j in range(len(output_head_list))]
-        for j in range(len(out_line)-1):
-            print(out_line[j].ljust(mx_len[j]), end=' ')
-        print(out_line[-1].ljust(mx_len[-1]))
+    for line in output_target_values_list:
+        for i in range(len(line) - 1):
+            print(line[i].ljust(mx_len[i]), end=' ')
+        print(line[-1].ljust(mx_len[-1]))
+        
+        # print(DISPLAY_FORMAT.format(element for element in out_line))
 
 
 if __name__ == '__main__':
