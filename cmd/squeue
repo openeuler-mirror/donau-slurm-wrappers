@@ -44,7 +44,7 @@ DISPLAY_TIME_LIMIT = 'TIME_LIMI'
 DISPLAY_NODELIST = 'NODELIST(REASON)'
 DISPLAY_STATE_SHORT = 'ST'
 DISPLAY_SHORT_FORMAT = '{:>13}{:>10}{:>9}{:>9}{:>3}{:>11}{:>7} {}'
-DISPLAY_LONG_FORMAT = '{:>13}{:>10}{:>9}{:>9}{:>9}{:>11} {:<10}{:>7}{:>17}'
+DISPLAY_LONG_FORMAT = '{:>13}{:>10}{:>9}{:>9}{:>9}{:>11} {:<10}{:>7} {}'
 DISPLAY_TIME_FORMAT = '%a %b %d %H:%M:%S %Y'
 # index of djob results
 JOB_QUERY_ID_INDEX = 0
@@ -271,6 +271,8 @@ def check_result_error(out_line):
         err_list = out_line.split()
         job_err_info.append(' '.join(err_list[1:]))
         return False
+    if 'Job query queue' in out_line and 'invalid' in out_line:
+        return False
     if 'not exist' in out_line:
         job_id = out_line.split()[0]
         err_msg = 'slurm_load_jobs error: Invalid job id specified'
@@ -306,6 +308,32 @@ def is_administrator():
     return adm_user == pwd.getpwuid(os.getuid())[0]
 
 
+def execute_job_query(query_command):
+    job_dict = {}
+    # execute command and get job list
+    output = os.popen(query_command).read()
+    job_info = output.splitlines()
+    if len(job_info) <= 1:
+        return job_dict
+    log('get output: %s' % output)
+    if 'no matches' in output:
+        return job_dict
+    # check result error, check second line is valid output
+    valid_info = []
+    for info in job_info[1:]:
+        if not check_result_error(info):
+            log('check djob result error: %s' % info)
+            print_title()
+        else:
+            valid_info.append(info)
+
+    for line in valid_info:
+        info = parse_job_info(line)
+        if len(info) > 0 and info[DISPLAY_ID] is not None:
+            job_dict[info[DISPLAY_ID]] = info
+    return job_dict
+
+
 def get_job_dict():
     global djob_path
     query_command = djob_path
@@ -336,41 +364,38 @@ def get_job_dict():
     if len(donau_job_states) == 0:
         donau_job_states = ['WAITING', 'PENDING', 'RUNNING', 'STOPPED']
     query_command += ' -s ' + '\'' + ' '.join(donau_job_states) + '\''
-    # filter job partitions
-    if len(job_partitions) > 0:
-        query_command += ' -q ' + '\'' + ' '.join(job_partitions) + '\''
-    # specify job IDs
-    for id in job_ids:
-        if not id.isdigit():
-            print('squeue: error: Invalid job id: %s' % id)
-            sys.exit(1)
-    if len(job_ids) > 0:
-        query_command += ' ' + ' '.join(job_ids)
-    log('query command: %s' % query_command)
 
-    job_dict = {}
-    # execute command and get job list
-    output = os.popen(query_command).read()
-    job_info = output.splitlines()
-    if len(job_info) <= 1:
-        return job_dict
-    log('get output: %s' % output)
-    if 'no matches' in output:
-        return job_dict
-    # check result error, check second line is valid output
-    valid_info = []
-    for info in job_info[1:]:
-        if not check_result_error(info):
-            log('check djob result error: %s' % info)
-            print_title()
-        else:
-            valid_info.append(info)
+    # filter job partition
+    # for multi queues/partitions query, if one of queue_names is invalid:
+    # donau would return failure and not display jobs in valid queues
+    # slurm would filter failure and display jobs in valid queues
+    if len(job_partitions) == 0:
+        # specify job IDs
+        for id in job_ids:
+            if not id.isdigit():
+                print('squeue: error: Invalid job id: %s' % id)
+                sys.exit(1)
+        if len(job_ids) > 0:
+            query_command += ' ' + ' '.join(job_ids)
+        return execute_job_query(query_command)
+    else:
+        base_command = query_command
+        job_dict = {}
+        for partition in job_partitions:
+            tmp_command = base_command + ' -q ' + partition
+            # specify job IDs
+            for id in job_ids:
+                if not id.isdigit():
+                    print('squeue: error: Invalid job id: %s' % id)
+                    sys.exit(1)
+            if len(job_ids) > 0:
+                tmp_command += ' ' + ' '.join(job_ids)
+            log('query command: %s' % tmp_command)
 
-    for line in valid_info:
-        info = parse_job_info(line)
-        if len(info) > 0 and info[DISPLAY_ID] is not None:
-            job_dict[info[DISPLAY_ID]] = info
-    return job_dict
+            single_query_result = execute_job_query(tmp_command)
+            for k, v in single_query_result.items():
+                job_dict[k] = v
+        return job_dict
 
 
 def adjust_display_sec(second):
