@@ -15,14 +15,19 @@ donau-slurm-wrappers提供了一些slurm命名风格的脚本，方便习惯使�
 #### 软件架构
 python2/python3
 
+#### 依赖
+1. 集群已安装Donau Scheduler, 安装版本 >= HPC22.0.0 B015, 安装节点可正常提交Donau-Cli命令。
+2. 脚本依赖python模块dateutil.relativedelte, 执行pip install python-dateutil安装。
 
 #### 安装教程
-
-1.  从网址https://gitee.com/openeuler/donau-slurm-wrappers 下载最新的脚本
-2.  更改脚本的属主为DONAU的CLI用户, 修改权限为555， 例如当前用户为ccs_cli，则执行
-    
+1. 从网址 https://gitee.com/openeuler/donau-slurm-wrappers 下载压缩包, 解压至用户的家目录
+2. 更改脚本的属主为DONAU的CLI用户, 修改权限为555， 例如当前用户为ccs_cli，则执行   
      
-     $chown -R ccs_cli:ccs_cli cmd && chmod 555 cmd/* 
+     $chown -R ccs_cli:ccs_cli donau-slurm-wrappers-master && chmod -R 555 donau-slurm-wrappers-master   
+
+3. 配置CLI用户的环境变量PATH, 将"donau-slurm-wrappers-master/cmd/"的绝对路径添加进PATH。（建议直接修改
+  用户的配置文件 ~/.bashrc 并source）
+  
     
 
 #### 使用说明
@@ -82,7 +87,6 @@ $CCS_MPI_OPTIONS。
     #SBATCH -o /tmp/log.txt
     #SBATCH -p root.default
     #SBATCH -N 2    
-    #SBATCH --ntasks-per-node 2
     #SBATCH --open-mode truncate
     sleep 2
     

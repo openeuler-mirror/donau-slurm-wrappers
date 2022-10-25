@@ -2,7 +2,7 @@
 
 #### Description
 Donau-slurm-wrappers provide some scripts for Slurm users to get start with Donau Scheduler quickly.
-These scripts with slurm command syntax and options execute Donau-CLI commands in the background.
+These scripts with slurm command syntax and options execute Donau-Cli commands in the background.
 
 Commands include:
 
@@ -14,14 +14,21 @@ Commands include:
 #### Software Architecture
 python2/python3
 
+#### Dependence
+1. Donau Scheduler has been installed, versions "HPC22.0.0 B015" or later are supported. 
+The Donau-Cli command can be submitted on the installation node successfully.  
+2.  Scripts depend on the python module "dateutil.relativedelte". Run the command 
+"pip install python-dateutil" to install it.
+
 #### Installation
-
-1.  Download the latest script from "https://gitee.com/openeuler/donau-slurm-wrappers"
-2.  Change the owner of the script to the Donau CLI user and change the permission to 555. 
+1. Download the package from "https://gitee.com/openeuler/donau-slurm-wrappers" and decompress it to the home directory of the user.
+2. Change the owner of the script to the Donau CLI user and change the permission to 555. 
 For example, if the current user is ccs_cli, run the following command:
+ 
+    $chown -R ccs_cli:ccs_cli donau-slurm-wrappers-master && chmod -R 555 donau-slurm-wrappers-master   
 
-    
-    $chown -R ccs_cli:ccs_cli cmd && chmod 555 cmd/* 
+3. Configure the environment variable PATH of the Cli user and add the absolute path of "donau-slurm-wrappers-master/cmd/" to PATH.
+(You are advised to modify file "~/.bashrc" and source it.)
 
 #### Instructions
 
@@ -80,7 +87,6 @@ Example of normal job:
     #SBATCH -o /tmp/log.txt
     #SBATCH -p root.default
     #SBATCH -N 2    
-    #SBATCH --ntasks-per-node 2
     #SBATCH --open-mode truncate
     sleep 2
     
