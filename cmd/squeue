@@ -309,6 +309,7 @@ def is_administrator():
 
 
 def execute_job_query(query_command):
+    log("query_command: %s" % query_command)
     job_dict = {}
     # execute command and get job list
     output = os.popen(query_command).read()

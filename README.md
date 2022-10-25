@@ -216,14 +216,14 @@ RUNNING, PENDING/WAITING, STOPPED。显示结果中"NODELIST(REASON)"的未调�
 一. donau-slurm-wrappers是对donau的一些cli命令的二次封装，命令的执行依赖于cli本身的规则。脚本不支持root用户
 调用, 同时在实际使用中可能会遇到token校验失败的问题。常见的token失败场景如下：
 
-1). 报错: "error: access token does not exist, please execute command dconfig to get token"
+1). 报错: "error: access token does not exist, please execute command dconfig to get token"  
     说明: 用户在执行CLI命令前，没有使用dconfig命令获取身份验证的token，需要执行dconfig命令获取token。
     或者用户在执行dconfig命令后，由于某种原因导致存储token的文件丢失，这种情况需要再次执行dconfig命令。
 
-2). 报错: "error: token expired! refresh token does not exist, please execute command dconfig to get token"
+2). 报错: "error: token expired! refresh token does not exist, please execute command dconfig to get token"  
     说明: 这种情况是因为token过期，且之前dconfig命令时没有返回用于刷新的refresh token。
 
-3). 报错: "token unauthorized"
+3). 报错: "token unauthorized"  
     说明: 用户未授权，没有加入用户组或管理员组。
     
     更多的错误及解决方案参考《HPC产品文档》。
