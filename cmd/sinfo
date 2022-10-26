@@ -80,7 +80,13 @@ def execute_cmd(cmd):
     # with open(filename, 'r') as fin:
     #     ret = fin.readlines()
     # return ret
+    cmd_ret = os.system(cmd + " >/dev/null 2>&1")
     f = os.popen(cmd).read().split('\n')
+    if cmd_ret != 0:
+        for line in f:
+            if "error" in line:
+                print(line)
+        sys.exit(cmd_ret)
     return f
 
 def get_slurm_cmd_opts_hit_map(opts, args):
@@ -563,7 +569,6 @@ def extend_with_partirion():
             if cur_node_index < node_cnt:
                 cur_par_index = 0
             cur_node_index += 1
-
     output_target_values_list = new_ret
 
 def print_format():
@@ -600,7 +605,7 @@ if __name__ == '__main__':
         sys.exit(1)
     check_donau_cli_env()
     init_config_with_env()
-    check_token()
+    #check_token()
     try:
         opts_hit_map.clear()
         # argstr = "sinfo.py -l".split()
