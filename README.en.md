@@ -145,7 +145,7 @@ The job state would be CANCELLED terminated by scancel.
                
 5.sinfo  
     The sinfo is used to query the node and partition information of the current cluster. (Slurm's partition
-does not correspond to Donau's queue. It provides convenient way for users to use Donau' squeue by partition.)  
+does not correspond to Donau's queue. It provides convenient way for users to use Donau's queue by partition.)  
 
 
     $sinfo --usage
@@ -170,12 +170,17 @@ Example:
     kwephicprd18119 1     all       mix
     
 6.scontrol  
-    The scontrol command is used to stop/resume jobs, corresponding to "djob -S"/"djob -R" in Donau.
+    The scontrol command is used to stop/resume jobs, corresponding to "djob -S/djob -R" in Donau.
     
     
     $scontrol --usage
-    scontrol: invalid option '--usage'
-    Try "scontrol --help" for more information
+    scontrol [<OPTION>] [<COMMAND>]  
+        Valid <OPTION> values are:                                             
+        --help     show this help message                                             
+
+        Valid <COMMAND> values are:
+        resume <jobid_list>      resume previously suspended job
+        suspend <jobid_list>     suspend specified job  
     
 7.sacct  
     The sacct is used to display accounting data for jobs. Supported job states include COMPLETED, FAILED, 
@@ -226,8 +231,8 @@ Common token errors are as follows:
      For details about more errors and solutions, see the "HPC Product Documentation".
 
 2.Users can set the environment "SLURM_TO_DONAU_DEBUG" true to enable debug log. If enabled, each script
-will generate a log file named "script_name.uid.pid" in /tmp directory. Log files are not automatically deleted 
-and need to be manually deleted. 
+will generate a log file named "script_name.uid.pid" in directory "/tmp". Log files can not be deleted automatically
+and need to be deleted manually. 
      
 #### Contribution
 

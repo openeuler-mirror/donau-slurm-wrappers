@@ -311,11 +311,11 @@ if __name__ == '__main__':
     check_donau_cli_env()
     init_config_with_env()
     short_options = ''
-    long_options = ['help']
+    long_options = ['help', 'usage']
     try:
         opts, args = getopt.getopt(sys.argv[1:], short_options, long_options)
         for opt_name, opt_value in opts:
-            if opt_name == '--help':
+            if opt_name == '--help' or opt_name == '--usage':
                 print(get_help_info())
                 sys.exit()
         # check remain args
