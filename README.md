@@ -86,7 +86,6 @@ $CCS_MPI_OPTIONS。
     #SBATCH -n 2
     #SBATCH -o /tmp/log.txt
     #SBATCH -p root.default
-    #SBATCH -N 2    
     #SBATCH --open-mode truncate
     sleep 2
     

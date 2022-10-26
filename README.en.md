@@ -85,8 +85,7 @@ Example of normal job:
     #SBATCH -J test_job
     #SBATCH -n 2
     #SBATCH -o /tmp/log.txt
-    #SBATCH -p root.default
-    #SBATCH -N 2    
+    #SBATCH -p root.default 
     #SBATCH --open-mode truncate
     sleep 2
     

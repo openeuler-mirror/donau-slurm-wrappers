@@ -144,6 +144,9 @@ def check_result_error(out_line):
             return False
         if out_job_info[0].isdigit():
             return True
+    if len(out_job_info) > 0 and out_job_info[0] == 'message':
+        err_info = ERR_MSG_FORMAT.format('message', ' '.join(out_job_info[1:]))
+        job_err_info.append(err_info)
     return False
 
 

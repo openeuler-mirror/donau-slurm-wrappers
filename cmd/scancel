@@ -15,6 +15,7 @@ job_name = ''
 job_state = ''
 job_user = ''
 job_partition = ''
+final_err_info = []
 # display items
 DISPLAY_ID = 'ID'
 DISPLAY_NAME = 'NAME'
@@ -170,22 +171,24 @@ def convert_job_state(slurm_job_state):
 
 
 def check_result_error(out_line):
+    global final_err_info
     # check permission
     if 'access to job' in out_line:
         err_info = out_line.split()
         if len(err_info) > 1:
             print('scancel: error: Kill job error: %s' % ' '.join(err_info[1:]))
         return False
-    if 'not exist' in out_line:
-        # err_info = out_line.split()
-        # if len(err_info) > 1:
-        #     print('scancel: error: Kill job error: %s' % ' '.join(err_info[1:]))
+    # for token expired and not exist error, it should be displayed
+    if 'not exist' in out_line and 'access token' not in out_line and 'token expired' not in out_line:
         return False
     if out_line.startswith('--'):
         return False
     out_job_info = out_line.split()
     if len(out_job_info) > 0 and out_job_info[0].isdigit():
         return True
+    if len(out_job_info) > 0 and out_job_info[0] == 'JOB_ID':
+        return False
+    final_err_info.append(out_line)
     return False
 
 
@@ -363,3 +366,5 @@ if __name__ == '__main__':
 
     job_dict = get_job_dict()
     cancel_jobs(job_dict)
+    for err_info in final_err_info:
+        print(err_info)
