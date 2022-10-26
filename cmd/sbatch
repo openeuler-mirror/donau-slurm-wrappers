@@ -320,12 +320,16 @@ def get_invalid_option(err_message):
         options = re.findall(r'option -(.*) not recognized', err_message)
         if len(options) == 1:
             return options[0]
+    elif "requires argument" in err_message:
+        options = re.findall(r'option (.*) requires argument', err_message)
+        if len(options) == 1:
+            return options[0]
     return ""
 
 
 def print_invalid_info(option):
-    print("sbatch: invalid option -- '" + option + "'")
-    log("sbatch: invalid option -- '" + option + "'")
+    print('sbatch: invalid option "' + option + '"')
+    log('sbatch: invalid option "' + option + '"')
     print('Try "sbatch --help" for more information')
     log('Try "sbatch --help" for more information')
 
@@ -431,7 +435,64 @@ sbatch: error: For instance: #!/bin/sh'''
                             sys.exit()
                     #'#'and 'SBATCH' cannot be preceded by blank characters
                     if lines[j].strip().startswith('#SBATCH') and len(lines[j].strip()) > 8:
-                        options, cmd = getopt.getopt(lines[j].strip()[8:].split(), short_options, long_options)
+                        line_option=lines[j].strip()[8:].split()
+                        options_value=list()
+                        start = 0
+                        end = 0
+                        i = 0
+                        while i < len(line_option):
+                            if (line_option[i].strip().startswith('"') and line_option[i].strip().endswith('"')) \
+                                    or (line_option[i].strip().startswith("'") and line_option[i].strip().endswith("'")):
+                                options_value.append(line_option[i].strip()[1:-1])
+                                i += 1
+                            elif line_option[i].strip().startswith('"'):
+                                start = i
+                                i += 1
+                                while i < len(line_option) and not line_option[i].strip().endswith('"'):
+                                    i += 1
+                                if i == len(line_option):
+                                    end = -1
+                                elif i < len(line_option) and line_option[i].strip().endswith('"'):
+                                    end = i
+                                if end == -1:
+                                    for j in range(i, len(line_option)):
+                                        options_value.append(line_option[j])
+                                    break
+                                elif end != -1 and end > start:
+                                    temptstr = ""
+                                    temptstr += line_option[start][1:] + " "
+                                    if end > start + 1:
+                                        for m in range(start + 1, end):
+                                            temptstr += line_option[m] + " "
+                                    temptstr += line_option[end][:-1]
+                                    options_value.append(temptstr)
+                                    i = end + 1
+                            elif line_option[i].strip().startswith("'"):
+                                start = i
+                                i += 1
+                                while i < len(line_option) and not line_option[i].strip().endswith("'"):
+                                    i += 1
+                                if i == len(line_option):
+                                    end = -1
+                                elif i < len(line_option) and line_option[i].strip().endswith("'"):
+                                    end = i
+                                if end == -1:
+                                    for j in range(i, len(line_option)):
+                                        options_value.append(line_option[j])
+                                    break
+                                elif end != -1 and end > start:
+                                    temptstr = ""
+                                    temptstr += line_option[start][1:] + " "
+                                    if end > start + 1:
+                                        for m in range(start + 1, end):
+                                            temptstr += line_option[m] + " "
+                                    temptstr += line_option[end][:-1]
+                                    options_value.append(temptstr)
+                                    i = end + 1
+                            else:
+                                options_value.append(line_option[i])
+                                i += 1
+                        options, cmd = getopt.getopt(options_value, short_options, long_options)
                         #handle_parameter_exception(opts)
                         update_dict(options)
 
@@ -505,7 +566,7 @@ def handle_parameter_exception():
     for opt_name, opt_value in option_dic.items():
         if opt_name == 'BEGIN':
             if not opt_value or opt_value.endswith('.sh'):
-                error_info = '''sbatch: option "--begin" requires an argument
+                error_info = '''sbatch: invalid option "--begin" 
 Try 'sbatch --help' for more info'''
                 print(error_info)
                 log(error_info)
@@ -523,14 +584,14 @@ Try 'sbatch --help' for more info'''
                 sys.exit()
         elif opt_name == 'COMMENT':
             if not opt_value or opt_value.endswith('.sh'):
-                error_info = '''sbatch: option "--comment" requires an argument
+                error_info = '''sbatch: invalid option "--comment"
 Try 'sbatch --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
         elif opt_name == 'SLURM_DEPENDENCY':
             if not opt_value or opt_value.endswith('.sh'):
-                error_info = '''sbatch: option "--dependency" requires an argument
+                error_info = '''sbatch: invalid option "--dependency" 
 Try 'sbatch --help' for more info'''
                 print(error_info)
                 log(error_info)
@@ -541,21 +602,21 @@ Try 'sbatch --help' for more info'''
                 sys.exit()
         elif opt_name == 'SLURM_WORKING_DIR':
             if not opt_value or opt_value.endswith('.sh'):
-                error_info = '''sbatch: option "--chdir" requires an argument
+                error_info = '''sbatch: invalid option "--chdir" 
 Try 'sbatch --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
         elif opt_name == 'SBATCH_EXPORT':
             if not opt_value or opt_value.endswith('.sh'):
-                error_info = '''sbatch: option "--export" requires an argument
+                error_info = '''sbatch: invalid option "--export" 
 Try 'sbatch --help' for more info'''
                 print(error_info)
                 log(error_info)
                 sys.exit()
         elif opt_name == 'SBATCH_ERROR':
             if not opt_value or opt_value.endswith('.sh'):
-                print('''sbatch: option "--error" requires an argument
+                print('''sbatch: invalid option "--error" 
 Try 'sbatch --help' for more info''')
                 log('''sbatch: option "--error" requires an argument
 Try 'sbatch --help' for more info''')
@@ -567,7 +628,7 @@ Try 'sbatch --help' for more info''')
                 sys.exit()
         elif opt_name == 'SBATCH_JOB_NAME':
             if not opt_value or opt_value.endswith('.sh'):
-                print('''sbatch: option "--job-name" requires an argument
+                print('''sbatch: invalid option "--job-name" 
 Try 'sbatch --help' for more info''')
                 log('''sbatch: option "--job-name" requires an argument
 Try 'sbatch --help' for more info''')
@@ -584,21 +645,27 @@ Try 'sbatch --help' for more info''')
                 sys.exit()
         elif opt_name == 'SBATCH_OUTPUT':
             if not opt_value or opt_value.endswith('.sh'):
-                print('''sbatch: option "--output" requires an argument
+                print('''sbatch: invalid option "--output" 
 Try 'sbatch --help' for more info''')
                 log('''sbatch: option "--output" requires an argument
 Try 'sbatch --help' for more info''')
                 sys.exit()
         elif opt_name == 'SBATCH_OPEN_MODE':
             if not opt_value or opt_value.endswith('.sh'):
-                print('''sbatch: option "--open-mode" requires an argument
+                print('''sbatch: invalid option "--open-mode" 
 Try 'sbatch --help' for more info''')
                 log('''sbatch: option "--open-mode" requires an argument
 Try 'sbatch --help' for more info''')
                 sys.exit()
+            elif opt_value and opt_value not in ['append','truncate']:
+                print('''sbatch: invalid option "--open-mode" 
+Try 'sbatch --help' for more info''')
+                log('''sbatch: invalid option "--open-mode"
+Try 'sbatch --help' for more info''')
+                sys.exit()
         elif opt_name == 'SBATCH_PARTITION':
             if not opt_value or opt_value.endswith('.sh'):
-                print('''sbatch: option "--partition" requires an argument
+                print('''sbatch: invalid option "--partition" 
 Try 'sbatch --help' for more info''')
                 log('''sbatch: option "--partition" requires an argument
 Try 'sbatch --help' for more info''')
@@ -622,16 +689,16 @@ Try 'sbatch --help' for more info''')
                 sys.exit()
         elif opt_name == 'SBATCH_NODELIST':
             if not opt_value or opt_value.endswith('.sh'):
-                print('''sbatch: option "--nodelist" requires an argument
+                print('''sbatch: invalid option "--nodelist" 
 Try 'sbatch --help' for more info''')
-                log('''sbatch: option "--nodelist" requires an argument
+                log('''sbatch: invalid option "--nodelist" 
 Try 'sbatch --help' for more info''')
                 sys.exit()
         elif opt_name == 'SBATCH_EXCLUDE':
             if not opt_value or opt_value.endswith('.sh'):
-                print('''sbatch: option "--exclude" requires an argument
+                print('''sbatch: invalid option "--exclude" 
 Try 'sbatch --help' for more info''')
-                log('''sbatch: option "--exclude" requires an argument
+                log('''sbatch: invalid option "--exclude" 
 Try 'sbatch --help' for more info''')
                 sys.exit()
         elif opt_name == 'SBATCH_NODES':
@@ -720,12 +787,15 @@ Parallel run options:
  -D, --chdir=directory              set working directory for batch script
  -e, --error=err                    file for batch script's standard error
      --export[=names]               specify environment variables to export
-     --gid=group_id                 group ID to run job as (user root only)
+     --gid=group_id                 group ID to run job 
  -J, --job-name=jobname             name of job
      --mpi=mpi_type                 type of mpi job
+                                    supported mpi job types include 'hmpi', 'openmpi', 'intelmpi', 'mpich'.
  -n, --ntasks=ntasks                number of tasks to run
      --ntasks-per-node=n            number of tasks to invoke on each node
+                                    only cosched and mpi job supports the options of ntasks_per_node.
  -N, --nodes=N                      number of nodes on which to run (N = min[-max])
+                                    only cosched and mpi job supports the options of nodes.
  -o, --output=out                   file for batch script's standard output
      --open-mode={append|truncate}  mode of open the output and error files
  -p, --partition=partition          partition requested
@@ -871,7 +941,7 @@ if __name__ == '__main__':
                 donau_command += '-R "gpu=' + str(option_dic["SBATCH_GPUS_PER_TASK"]) + '" '
         if "SBATCH_NODELIST" in option_dic and "SBATCH_EXCLUDE" in option_dic:
             pattern1 = re.compile(".+\[\d+-\d+(,\d)*\]")
-            pattern2 = re.compile("[A-Za-z@_0-9-.]+(,[A-Za-z@_0-9-.]*)*")
+            pattern2 = re.compile("[A-Za-z@_0-9-.]+((,| )[A-Za-z@_0-9-.]*)*")
             m_node1 = pattern1.match(option_dic["SBATCH_NODELIST"])
             m_exclude1 = pattern1.match(option_dic["SBATCH_EXCLUDE"])
             m_node2 = pattern2.match(option_dic["SBATCH_NODELIST"])
@@ -885,9 +955,14 @@ if __name__ == '__main__':
                     option_dic[
                         "SBATCH_EXCLUDE"]:
                 donau_command += "-pn '" + str(option_dic["SBATCH_NODELIST"]) + " "
-                for item in str(option_dic["SBATCH_EXCLUDE"]).strip().split(','):
-                    if item:
-                        donau_command += '!' + item + ' '
+                if ',' in str(option_dic["SBATCH_EXCLUDE"]):
+                    for item in str(option_dic["SBATCH_EXCLUDE"]).strip().split(','):
+                        if item:
+                            donau_command += '!' + item + ' '
+                else:
+                    for item in str(option_dic["SBATCH_EXCLUDE"]).strip().split():
+                        if item:
+                            donau_command += '!' + item + ' '
                 donau_command += "' "
             elif m_node2 and m_node2.group(0) == option_dic["SBATCH_NODELIST"] and m_exclude1 and m_exclude1.group(0) == \
                     option_dic[
@@ -899,9 +974,14 @@ if __name__ == '__main__':
                         "SBATCH_EXCLUDE"]:
                 donau_command += "-pn '" + str(option_dic["SBATCH_NODELIST"]).replace(',', ' ')
                 donau_command += ' '
-                for item in str(option_dic["SBATCH_EXCLUDE"]).strip().split(','):
-                    if item:
-                        donau_command += '!' + item + ' '
+                if ',' in str(option_dic["SBATCH_EXCLUDE"]):
+                    for item in str(option_dic["SBATCH_EXCLUDE"]).strip().split(','):
+                        if item:
+                            donau_command += '!' + item + ' '
+                else:
+                    for item in str(option_dic["SBATCH_EXCLUDE"]).strip().split():
+                        if item:
+                            donau_command += '!' + item + ' '
                 donau_command += "' "
             else:
                 donau_command += "-pn '" + str(option_dic["SBATCH_NODELIST"]) + " !" + str(
@@ -909,7 +989,7 @@ if __name__ == '__main__':
         elif "SBATCH_NODELIST" in option_dic:
             pattern1 = re.compile(".+\[\d+-\d+(,\d)*\]")
             m1 = pattern1.match(option_dic["SBATCH_NODELIST"])
-            pattern2 = re.compile("[A-Za-z@_0-9-.]+(,[A-Za-z@_0-9-.]*)*")
+            pattern2 = re.compile("[A-Za-z@_0-9-.]+((,| )[A-Za-z@_0-9-.]*)*")
             m2 = pattern2.match(option_dic["SBATCH_NODELIST"])
             if m1 and m1.group(0) == option_dic["SBATCH_NODELIST"]:
                 donau_command += "-pn '" + str(option_dic["SBATCH_NODELIST"]) + "' "
@@ -918,15 +998,20 @@ if __name__ == '__main__':
         elif "SBATCH_EXCLUDE" in option_dic:
             pattern1 = re.compile(".+\[\d+-\d+(,\d)*\]")
             m1 = pattern1.match(option_dic["SBATCH_EXCLUDE"])
-            pattern2 = re.compile("[A-Za-z@_0-9-.]+(,[A-Za-z@_0-9-.]*)*")
+            pattern2 = re.compile("[A-Za-z@_0-9-.]+((,| )[A-Za-z@_0-9-.]*)*")
             m2 = pattern2.match(option_dic["SBATCH_EXCLUDE"])
             if m1 and m1.group(0) == option_dic["SBATCH_EXCLUDE"]:
                 donau_command += "-pn '!" + str(option_dic["SBATCH_EXCLUDE"]) + "' "
             elif m2 and m2.group(0) == option_dic["SBATCH_EXCLUDE"]:
                 donau_command += "-pn '"
-                for item in str(option_dic["SBATCH_EXCLUDE"]).strip().split(','):
-                    if item:
-                        donau_command += '!' + item + ' '
+                if ',' in str(option_dic["SBATCH_EXCLUDE"]):
+                    for item in str(option_dic["SBATCH_EXCLUDE"]).strip().split(','):
+                        if item:
+                            donau_command += '!' + item + ' '
+                else:
+                    for item in str(option_dic["SBATCH_EXCLUDE"]).strip().split():
+                        if item:
+                            donau_command += '!' + item + ' '
                 donau_command += "' "
         if "SBATCH_NODES" in option_dic:
             donau_command += '-nn ' + option_dic["SBATCH_NODES"]
