@@ -137,9 +137,19 @@ def init_config_with_env():
 
 
 def is_administrator():
-    cmd = 'dadmin show config -n cluster.administrators > /dev/null'
-    ret = os.system(cmd)
-    return ret == 0
+    cmd = 'dadmin show config -n cluster.administrators'
+    output = os.popen(cmd).read()
+    out_infos = output.splitlines()
+    if len(out_infos) == 1:
+        print(out_infos[0])
+        sys.exit(1)
+    if len(out_infos) == 2:
+        value_infos = out_infos[1].split()
+        if len(value_infos) == 3:
+            name_item_str = value_infos[0]
+            value_item_str = value_infos[2]
+            return name_item_str == 'cluster.administrators' and value_item_str == pwd.getpwuid(os.getuid())[0]
+    return False
 
 
 def check_user(user_name):
@@ -355,6 +365,7 @@ if __name__ == '__main__':
                     log('get job id from command: %s' % id)
                     if not id.isdigit():
                         print('scancel: error: Invalid job id %s specified' % id)
+                        sys.exit(1)
                     job_ids.append(id)
     except getopt.GetoptError as err:
         invalid_option = get_invalid_option(str(err))
