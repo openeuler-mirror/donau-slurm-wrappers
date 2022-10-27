@@ -232,7 +232,8 @@ def check_result_error(out_line):
         return False
     if out_line.startswith('---'):
         return False
-    if 'not exist' in out_line and 'token expired' not in out_line:
+    # for token expired and not exist error, it should be displayed
+    if 'not exist' in out_line and 'token expired' not in out_line and 'access token' not in out_line:
         return False
     out_job_info = out_line.split()
     if len(out_job_info) > 0 and out_job_info[0].isdigit():
