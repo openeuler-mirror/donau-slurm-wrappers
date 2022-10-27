@@ -325,15 +325,15 @@ def split_dependency(dependency):
 
 def get_invalid_option(err_message):
     if "not recognized" in err_message:
-        options = re.findall(r'option -(.*) not recognized', err_message)
+        options = re.findall(r'option (.*) not recognized', err_message)
         if len(options) == 1:
             return options[0]
     return ""
 
 
 def print_invalid_info(option):
-    print("srun: invalid option -- '" + option + "'")
-    log("srun: invalid option -- '" + option + "'")
+    print("srun: invalid option '" + option + "'")
+    log("srun: invalid option '" + option + "'")
     print('''Try "srun --help" for more information''')
     log('''Try "srun --help" for more information''')
 
