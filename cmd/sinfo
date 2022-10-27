@@ -84,7 +84,7 @@ def execute_cmd(cmd):
     f = os.popen(cmd).read().split('\n')
     if cmd_ret != 0:
         for line in f:
-            if "error" in line:
+            if "error" in line or "message" in line:
                 print(line)
         sys.exit(cmd_ret)
     return f
