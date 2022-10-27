@@ -6,6 +6,7 @@ import sys
 import getopt
 import os
 import subprocess
+import signal
 from dateutil.relativedelta import relativedelta
 
 
@@ -324,15 +325,15 @@ def split_dependency(dependency):
 
 def get_invalid_option(err_message):
     if "not recognized" in err_message:
-        options = re.findall(r'option -(.*) not recognized', err_message)
+        options = re.findall(r'option (.*) not recognized', err_message)
         if len(options) == 1:
             return options[0]
     return ""
 
 
 def print_invalid_info(option):
-    print("srun: invalid option -- '" + option + "'")
-    log("srun: invalid option -- '" + option + "'")
+    print("srun: invalid option '" + option + "'")
+    log("srun: invalid option '" + option + "'")
     print('''Try "srun --help" for more information''')
     log('''Try "srun --help" for more information''')
 
@@ -469,7 +470,6 @@ Try 'srun --help' for more info'''
                 log('srun: error: Invalid numeric value "' + opt_value + '" for --gpus-per-task.')
                 sys.exit()
         elif opt_name == 'SRUN_NODELIST':
-            print(opt_value)
             if not opt_value or opt_value.endswith('.sh'):
                 error_info = '''srun: option "--nodelist" requires an argument
 Try 'srun --help' for more info'''
@@ -617,41 +617,40 @@ def get_help_info():
     help_info = '''Usage: srun [OPTIONS(0)... [executable(0) [args(0)...]]] [ : [OPTIONS(N)...]] executable(N) [args(N)...]
 
 Parallel run options:
--b, --begin=time                       defer job until HH:MM MM/DD/YY
--c, --cpus-per-task=ncpus              number of cpus required per task
-    --comment=name                     arbitrary comment
--d, --dependency=type:jobid            defer job until condition on jobid is satisfied
--D, --chdir=path                       change remote current working directory
-    --export=env_vars|NONE             environment variables passed to launcher with
-                                       optional values or NONE (pass no variables)
--e, --error=err                        location of stderr redirection
-    --epilog=program                   run "program" after launching job step
-    --gid=group_id                     group ID to run job as (user root only)
--J, --job-name=jobname                 name of job
--n, --ntasks=ntasks                    number of tasks to run
--o, --output=out                       location of stdout redirection
-    --open-mode={append|truncate}      mode of open the output and error files
--p, --partition=partition              partition requested
-    --priority=value                   set the priority of the job to value
-    --prolog=program                   run "program" before launching job step
-    --pty                              run task zero in pseudo terminal
--t, --time=minutes                     time limit
+-b, --begin=time                              defer job until HH:MM MM/DD/YY
+-c, --cpus-per-task=ncpus                     number of cpus required per task
+    --comment=name                            arbitrary comment
+-d, --dependency=type:jobid                   defer job until condition on jobid is satisfied
+-D, --chdir=path                              change remote current working directory
+    --export=env_vars|NONE                    environment variables passed to launcher with
+                                              optional values or NONE (pass no variables)
+-e, --error=err                               location of stderr redirection
+    --epilog=program                          run "program" after launching job
+    --gid=group_id                            group ID to run job 
+-J, --job-name=jobname                        name of job
+-n, --ntasks=ntasks                           number of tasks to run
+-o, --output=out                              location of stdout redirection
+    --open-mode={append|truncate}             mode of open the output and error files
+-p, --partition=partition                     partition requested
+    --priority=value                          set the priority of the job to value
+    --prolog=program                          run "program" before launching job
+    --pty                                     run interactive job
+-t, --time=minutes                            time limit
 
 Constraint options:
--w, --nodelist=hosts...                request a specific list of hosts
--x, --exclude=hosts...                 exclude a specific list of hosts 
+-w, --nodelist=hosts...                       request a specific list of hosts
+-x, --exclude=hosts...                        exclude a specific list of hosts 
 
 Consumable resources related options:
-    --exclusive                        for job allocation, this allocates nodes in
-                                       in exclusive mode
-                                       for job steps, this is equivalent to --exact
+    --exclusive                               for job allocation, this allocates nodes in
+                                              in exclusive mode
 
 GPU scheduling options:
-    --gpus-per-task=n                  number of GPUs required per spawned task
+    --gpus-per-task=n                         number of GPUs required per spawned task
 
 Help options:
-    --help                             show this help message
-    --usage                            display brief usage message'''
+    --help                                    show this help message
+    --usage                                   display brief usage message'''
     return help_info
 
 
@@ -669,6 +668,7 @@ def get_usage_info():
 
     
 if __name__ == '__main__':
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
     if os.getuid() == 0:
         print('Permission denied. The root user is not allowed to operate.')
         log('Permission denied. The root user is not allowed to operate.')
@@ -764,21 +764,73 @@ if __name__ == '__main__':
         elif "SLURM_GPUS_PER_TASK" in option_dic:
             donau_command += '-R "gpu=' + str(option_dic["SLURM_GPUS_PER_TASK"]) + '" '
         if "SRUN_NODELIST" in option_dic and "SRUN_EXCLUDE" in option_dic:
-            donau_command += '-pn "' + str(option_dic["SRUN_NODELIST"]) + " " + str(
-                option_dic["SRUN_EXCLUDE"]) + '" '
+            pattern1 = re.compile(".+\[\d+-\d+(,\d)*\]")
+            pattern2 = re.compile("[A-Za-z@_0-9-.]+((,| )[A-Za-z@_0-9-.]*)*")
+            m_node1 = pattern1.match(option_dic["SRUN_NODELIST"])
+            m_exclude1 = pattern1.match(option_dic["SRUN_EXCLUDE"])
+            m_node2 = pattern2.match(option_dic["SRUN_NODELIST"])
+            m_exclude2 = pattern2.match(option_dic["SRUN_EXCLUDE"])
+            if m_node1 and m_node1.group(0) == option_dic["SRUN_NODELIST"] and m_exclude1 and m_exclude1.group(0) == \
+                    option_dic["SRUN_EXCLUDE"]:
+                donau_command += "-pn '" + str(option_dic["SRUN_NODELIST"]) + " !" + str(option_dic["SRUN_EXCLUDE"]) + "' "
+            elif m_node1 and m_node1.group(0) == option_dic["SRUN_NODELIST"] and m_exclude2 and m_exclude2.group(0) == \
+                    option_dic["SRUN_EXCLUDE"]:
+                donau_command += "-pn '" + str(option_dic["SRUN_NODELIST"]) + " "
+                if ',' in str(option_dic["SRUN_EXCLUDE"]):
+                    for item in str(option_dic["SRUN_EXCLUDE"]).strip().split(','):
+                        if item:
+                            donau_command += '!' + item + ' '
+                else:
+                    for item in str(option_dic["SRUN_EXCLUDE"]).strip().split():
+                        if item:
+                            donau_command += '!' + item + ' '
+                donau_command += "' "
+            elif m_node2 and m_node2.group(0) == option_dic["SRUN_NODELIST"] and m_exclude1 and m_exclude1.group(0) == \
+                    option_dic["SRUN_EXCLUDE"]:
+                donau_command += "-pn '" + str(option_dic["SRUN_NODELIST"]).replace(',', ' ')
+                donau_command += " !" + str(option_dic["SRUN_EXCLUDE"]) + "' "
+            elif m_node2 and m_node2.group(0) == option_dic["SRUN_NODELIST"] and m_exclude2 and m_exclude2.group(0) == \
+                    option_dic["SRUN_EXCLUDE"]:
+                donau_command += "-pn '" + str(option_dic["SRUN_NODELIST"]).replace(',', ' ')
+                donau_command += ' '
+                if ',' in str(option_dic["SRUN_EXCLUDE"]):
+                    for item in str(option_dic["SRUN_EXCLUDE"]).strip().split(','):
+                        if item:
+                            donau_command += '!' + item + ' '
+                else:
+                    for item in str(option_dic["SRUN_EXCLUDE"]).strip().split():
+                        if item:
+                            donau_command += '!' + item + ' '
+                donau_command += "' "
+            else:
+                donau_command += "-pn '" + str(option_dic["SRUN_NODELIST"]) + " !" + str(option_dic["SRUN_EXCLUDE"]) + "' "
         elif "SRUN_NODELIST" in option_dic:
-            if '[' in str(option_dic["SRUN_NODELIST"]) and ']' in str(option_dic["SRUN_NODELIST"]):
-                donau_command += '-pn "' + str(option_dic["SRUN_NODELIST"]) + '" '
-            else:
-                donau_command += '-pn "' + str(option_dic["SRUN_NODELIST"]).replace(',', ' ') + '" '
+            pattern1 = re.compile(".+\[\d+-\d+(,\d)*\]")
+            m1 = pattern1.match(option_dic["SRUN_NODELIST"])
+            pattern2 = re.compile("[A-Za-z@_0-9-.]+((,| )[A-Za-z@_0-9-.]*)*")
+            m2 = pattern2.match(option_dic["SRUN_NODELIST"])
+            if m1 and m1.group(0) == option_dic["SRUN_NODELIST"]:
+                donau_command += "-pn '" + str(option_dic["SRUN_NODELIST"]) + "' "
+            elif m2 and m2.group(0) == option_dic["SRUN_NODELIST"]:
+                donau_command += "-pn '" + str(option_dic["SRUN_NODELIST"]).replace(',', ' ') + "' "
         elif "SRUN_EXCLUDE" in option_dic:
-            if '[' in str(option_dic["SRUN_EXCLUDE"]) and ']' in str(option_dic["SRUN_EXCLUDE"]):
-                donau_command += '-pn "!' + str(option_dic["SRUN_EXCLUDE"]) + '" '
-            else:
-                donau_command += '-pn "'
-                for item in str(option_dic["SRUN_EXCLUDE"]).split(','):
-                    donau_command += '!' + item + ' '
-                donau_command += '" '
+            pattern1 = re.compile(".+\[\d+-\d+(,\d)*\]")
+            m1 = pattern1.match(option_dic["SRUN_EXCLUDE"])
+            pattern2 = re.compile("[A-Za-z@_0-9-.]+((,| )[A-Za-z@_0-9-.]*)*")
+            m2 = pattern2.match(option_dic["SRUN_EXCLUDE"])
+            if m1 and m1.group(0) == option_dic["SRUN_EXCLUDE"]:
+                donau_command += "-pn '!" + str(option_dic["SRUN_EXCLUDE"]) + "' "
+            elif m2 and m2.group(0) == option_dic["SRUN_EXCLUDE"]:
+                donau_command += "-pn '"
+                if ',' in str(option_dic["SRUN_EXCLUDE"]):
+                    for item in str(option_dic["SRUN_EXCLUDE"]).strip().split(','):
+                        if item:
+                            donau_command += '!' + item + ' '
+                else:
+                    for item in str(option_dic["SRUN_EXCLUDE"]).strip().split():
+                        if item:
+                            donau_command += '!' + item + ' '
+                donau_command += "' "
         if args == []:
             print('srun: fatal: No command given to execute.')
             log('srun: fatal: No command given to execute.')
