@@ -869,6 +869,9 @@ if __name__ == '__main__':
         if "SBATCH_EXPORT" in option_dic:
             donau_command += '-x ' + '"' + option_dic["SBATCH_EXPORT"] + '" '
         if "SBATCH_ERROR" in option_dic:
+            option_dic["SBATCH_ERROR"]=option_dic["SBATCH_ERROR"].replace('%j','%J')
+            option_dic["SBATCH_ERROR"]=option_dic["SBATCH_ERROR"].replace('%t','%I')
+            option_dic["SBATCH_ERROR"]=option_dic["SBATCH_ERROR"].replace('%u','%U')
             if output_mode:
                 donau_command += '-e ' + '"' + option_dic["SBATCH_ERROR"] + '" '
             else:
@@ -887,6 +890,9 @@ if __name__ == '__main__':
         if "SLURM_NTASKS" in option_dic:
             donau_command += '-N ' + option_dic["SLURM_NTASKS"] + ' '
         if "SBATCH_OUTPUT" in option_dic:
+            option_dic["SBATCH_OUTPUT"]=option_dic["SBATCH_OUTPUT"].replace('%j','%J')
+            option_dic["SBATCH_OUTPUT"]=option_dic["SBATCH_OUTPUT"].replace('%t','%I')
+            option_dic["SBATCH_OUTPUT"]=option_dic["SBATCH_OUTPUT"].replace('%u','%U')
             if output_mode:
                 donau_command += '-o ' + '"' + option_dic["SBATCH_OUTPUT"] + '" '
             else:

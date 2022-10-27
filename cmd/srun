@@ -733,6 +733,9 @@ if __name__ == '__main__':
         if "SLURM_EXPORT_ENV" in option_dic:
             donau_command += '-x "' + option_dic["SLURM_EXPORT_ENV"] + '" '
         if "SLURM_STDERRMODE" in option_dic:
+            option_dic["SLURM_STDERRMODE"]=option_dic["SLURM_STDERRMODE"].replace('%j','%J')
+            option_dic["SLURM_STDERRMODE"]=option_dic["SLURM_STDERRMODE"].replace('%t','%I')
+            option_dic["SLURM_STDERRMODE"]=option_dic["SLURM_STDERRMODE"].replace('%u','%U')
             if output_mode:
                 donau_command += '-e "' + option_dic["SLURM_STDERRMODE"] + '" '
             else:
@@ -744,6 +747,9 @@ if __name__ == '__main__':
         if "SLURM_JOB_NAME" in option_dic:
             donau_command += '--name "' + option_dic["SLURM_JOB_NAME"] + '" '
         if "SLURM_STDOUTMODE" in option_dic:
+            option_dic["SLURM_STDOUTMODE"]=option_dic["SLURM_STDOUTMODE"].replace('%j','%J')
+            option_dic["SLURM_STDOUTMODE"]=option_dic["SLURM_STDOUTMODE"].replace('%t','%I')
+            option_dic["SLURM_STDOUTMODE"]=option_dic["SLURM_STDOUTMODE"].replace('%u','%U')
             if output_mode:
                 donau_command += '-o "' + option_dic["SLURM_STDOUTMODE"] + '" '
             else:
