@@ -86,7 +86,6 @@ $CCS_MPI_OPTIONS。
     #SBATCH -n 2
     #SBATCH -o /tmp/log.txt
     #SBATCH -p root.default
-    #SBATCH -N 2    
     #SBATCH --open-mode truncate
     sleep 2
     
@@ -138,14 +137,15 @@ RUNNING, PENDING/WAITING, STOPPED。显示结果中"NODELIST(REASON)"的未调�
           522   root.q1  default  test_st SUSPENDE   11:29:22 UNLIMITED       1  kwephicprd18119
     
 
-4.  scancel命令
-    scancel支持终止未完成的作业，对应的DONAU命令为djob -T, 执行scancel后的作业状态为CANCELLED。
+4.scancel命令
+    scancel支持终止未完成的作业，对应的DONAU命令为djob -T, 执行scancel后的作业状态为CANCELLED。  
 
 
     
-    $scancel --usage  
-    Usage: scancel [-n job_name] [-p partitions]
-              [-t PENDING | RUNNING | SUSPENDED] [--usage] [-u user_name] [job_id]
+     $scancel --usage  
+     Usage: scancel [-n job_name] [-p partitions]
+              [-t PENDING | RUNNING | SUSPENDED] [--usage] [-u user_name] [job_id]  
+    
     
 5.sinfo命令  
     sinfo用于查询当前集群的节点和分区信息(SLURM的PARTITION和DONAU的QUEUE是两种概念，为了用户对指定QUEUE
@@ -180,9 +180,15 @@ RUNNING, PENDING/WAITING, STOPPED。显示结果中"NODELIST(REASON)"的未调�
     
     
     $scontrol --usage
-    scontrol: invalid option '--usage'
-    Try "scontrol --help" for more information
-    
+    scontrol [<OPTION>] [<COMMAND>]  
+        Valid <OPTION> values are:                                             
+        --help     show this help message                                             
+
+        Valid <COMMAND> values are:
+        resume <jobid_list>      resume previously suspended job
+        suspend <jobid_list>     suspend specified job  
+
+
 7.sacct命令  
     sacct查询作业的记账信息，支持查询的作业状态有COMPLETED, FAILED, CANCELLED, RUNNING，对应的DONAU
 作业状态为SUCCEEDED, FAILED, RUNNING)。
