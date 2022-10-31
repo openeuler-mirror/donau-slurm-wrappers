@@ -17,7 +17,7 @@ python2/python3
 
 #### 依赖
 1. 集群已安装Donau Scheduler, 安装版本 >= HPC22.0.0 B015, 安装节点可正常提交Donau-Cli命令。
-2. 脚本依赖python模块dateutil.relativedelte, 执行pip install python-dateutil安装。
+2. 脚本依赖python模块dateutil.relativedelta, 执行pip install python-dateutil安装。
 
 #### 安装教程
 1. 从网址 https://gitee.com/openeuler/donau-slurm-wrappers 下载压缩包, 解压至用户的家目录
