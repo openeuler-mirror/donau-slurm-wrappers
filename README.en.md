@@ -17,7 +17,7 @@ python2/python3
 #### Dependence
 1. Donau Scheduler has been installed, versions "HPC22.0.0 B015" or later are supported. 
 The Donau-Cli command can be submitted on the installation node successfully.  
-2.  Scripts depend on the python module "dateutil.relativedelte". Run the command 
+2.  Scripts depend on the python module "dateutil.relativedelta". Run the command 
 "pip install python-dateutil" to install it.
 
 #### Installation
