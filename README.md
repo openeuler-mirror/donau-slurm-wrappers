@@ -110,9 +110,9 @@ MPI作业举例:
            
                 
 3.squeue命令   
-    squeue支持查询未完成(RUNNING, PENDING, SUSPENDED)的作业信息，对应的DONAU作业的状态为
-RUNNING, PENDING/WAITING, STOPPED。显示结果中"NODELIST(REASON)"的未调度原因，直接使用DONAU
-中task的"MAIN_STATE_REASON_CODE", 具体原因参考《HPC产品文档》。
+    squeue支持查询未完成(RUNNING, PENDING, SUSPENDED)的作业信息，对应的DONAU作业的状态为RUNNING, PENDING/WAITING,   
+STOPPED。显示结果中"NODELIST(REASON)"的未调度原因，直接使用DONAU中task的"MAIN_STATE_REASON_CODE",   
+具体原因参考《HPC产品文档》。
 
 
     
@@ -137,7 +137,7 @@ RUNNING, PENDING/WAITING, STOPPED。显示结果中"NODELIST(REASON)"的未调�
           522   root.q1  default  test_st SUSPENDE   11:29:22 UNLIMITED       1  kwephicprd18119
     
 
-4.scancel命令
+4.scancel命令  
     scancel支持终止未完成的作业，对应的DONAU命令为djob -T, 执行scancel后的作业状态为CANCELLED。  
 
 
@@ -191,7 +191,7 @@ RUNNING, PENDING/WAITING, STOPPED。显示结果中"NODELIST(REASON)"的未调�
 
 7.sacct命令  
     sacct查询作业的记账信息，支持查询的作业状态有COMPLETED, FAILED, CANCELLED, RUNNING，对应的DONAU
-作业状态为SUCCEEDED, FAILED, RUNNING)。
+作业状态为SUCCEEDED, FAILED, RUNNING。
 
     
    

@@ -238,6 +238,8 @@ def check_result_error(out_line):
     out_job_info = out_line.split()
     if len(out_job_info) > 0 and out_job_info[0].isdigit():
         return True
+    if len(out_job_info) > 0 and out_job_info[0] == 'JOB_ID':
+        return False
     job_err_info.append(out_line)
     return False
 
@@ -296,15 +298,18 @@ def get_job_dict():
     job_dict = {}
     # execute command and get job list
     output = os.popen(query_command).read()
-    job_info = output.splitlines()
-    if len(job_info) <= 1:
-        return job_dict
     log('get output: %s' % output)
+    job_info = output.splitlines()
+    if len(job_info) == 0:
+        return job_dict
+    if len(job_info) == 1 and 'error' in job_info[0]:
+        print(job_info[0])
+        sys.exit(1)
     if 'no matches' in output:
         return job_dict
     # check result error, check second line is valid output
     valid_info = []
-    for info in job_info[1:]:
+    for info in job_info:
         if not check_result_error(info):
             log('check djob result error: %s' % info)
             print_title()
