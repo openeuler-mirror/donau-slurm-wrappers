@@ -222,7 +222,7 @@ def parse_query_result(query_lines):
     if len(query_lines) <= 1:
         return local_job_dict
     valid_info = []
-    for info in query_lines[1:]:
+    for info in query_lines:
         if not check_result_error(info):
             log('check djob result error: %s' % info)
         else:
