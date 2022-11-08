@@ -237,7 +237,7 @@ def job_control():
     if len(job_info) == 1 and 'error' in job_info[0]:
         print(job_info[0])
         sys.exit(1)
-    # check result error, check second line is valid output
+    # check result error
     for info in job_info:
         if not check_result_error(info):
             log('check djob result error: %s' % info)
