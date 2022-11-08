@@ -140,10 +140,10 @@ def print_invalid_option(option):
     if len(option) == 0:
         return
     if len(option) > 1 and option[1] == '-':
-        print("scacct: invalid option '" + option + "'")
+        print("sacct: invalid option '" + option + "'")
     else:
-        print("scacct: invalid option -- '" + option[1:] + "'")
-    print('''Try "scacct --help" for more information''')
+        print("sacct: invalid option -- '" + option[1:] + "'")
+    print('''Try "sacct --help" for more information''')
 
 
 def check_time_format(input_time):
@@ -252,6 +252,36 @@ def check_user(user_name):
     return True
 
 
+def execute_query(query_command):
+    log('query_command: %s' % query_command)
+    job_dict = {}
+    # execute command and get job list
+    output = os.popen(query_command).read()
+    log('get output: %s' % output)
+    job_info = output.splitlines()
+    if len(job_info) == 0:
+        return job_dict
+    if len(job_info) == 1 and 'error' in job_info[0]:
+        print(job_info[0])
+        sys.exit(1)
+    if 'no matches' in output:
+        return job_dict
+    # check result error
+    valid_info = []
+    for info in job_info:
+        if not check_result_error(info):
+            log('check djob result error: %s' % info)
+            print_title()
+        else:
+            valid_info.append(info)
+
+    for line in valid_info:
+        info = parse_job_info(line)
+        if len(info) > 0 and info[DISPLAY_ID] is not None:
+            job_dict[info[DISPLAY_ID]] = info
+    return job_dict
+
+
 def get_job_dict():
     global djob_path
     query_command = djob_path
@@ -286,41 +316,34 @@ def get_job_dict():
         query_command += ' -st ' + '\'' + job_start_time + '\''
     if len(job_end_time) > 0:
         query_command += ' -et ' + '\'' + job_end_time + '\''
-    # specify job IDs
-    for job_id in job_ids:
-        if not job_id.isdigit():
-            print('sacct: fatal: Bad job/step specified: %s' % job_id)
-            sys.exit(1)
-        else:
-            query_command += ' ' + job_id
-    log('query command: %s' % query_command)
-
-    job_dict = {}
-    # execute command and get job list
-    output = os.popen(query_command).read()
-    log('get output: %s' % output)
-    job_info = output.splitlines()
-    if len(job_info) == 0:
-        return job_dict
-    if len(job_info) == 1 and 'error' in job_info[0]:
-        print(job_info[0])
-        sys.exit(1)
-    if 'no matches' in output:
-        return job_dict
-    # check result error, check second line is valid output
-    valid_info = []
-    for info in job_info:
-        if not check_result_error(info):
-            log('check djob result error: %s' % info)
-            print_title()
-        else:
-            valid_info.append(info)
-
-    for line in valid_info:
-        info = parse_job_info(line)
-        if len(info) > 0 and info[DISPLAY_ID] is not None:
-            job_dict[info[DISPLAY_ID]] = info
-    return job_dict
+    # if user specifies start time or end time, scripts should cover all the filter type in donau
+    # supported filter types include 'submit', 'start', 'end'
+    final_job_dict = {}
+    if len(job_start_time) > 0 or len(job_end_time) > 0:
+        filter_types = ['submit', 'start', 'end']
+        for filter_type in filter_types:
+            base_command = query_command
+            base_command += ' -t ' + filter_type
+            # specify job IDs
+            for job_id in job_ids:
+                if not job_id.isdigit():
+                    print('sacct: fatal: Bad job/step specified: %s' % job_id)
+                    sys.exit(1)
+                else:
+                    base_command += ' ' + job_id
+            # get job dict by command
+            job_dict = execute_query(base_command)
+            final_job_dict.update(job_dict)
+        return final_job_dict
+    else:
+        # specify job IDs
+        for job_id in job_ids:
+            if not job_id.isdigit():
+                print('sacct: fatal: Bad job/step specified: %s' % job_id)
+                sys.exit(1)
+            else:
+                query_command += ' ' + job_id
+        return execute_query(query_command)
 
 
 def parse_err_code(exit_msg):
@@ -530,6 +553,8 @@ if __name__ == '__main__':
     print_title()
     if len(job_info_dict) > 0:
         print_query_job_info(job_info_dict)
-    for err_info in job_err_info:
+    # Deduplicate error info
+    display_err_info = list(set(job_err_info))
+    for err_info in display_err_info:
         print(err_info)
 
