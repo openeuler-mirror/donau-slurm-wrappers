@@ -69,11 +69,11 @@ def print_single_option(option):
         return
     if option.startswith('--'):
         print("scancel: option '%s' requires an argument" % option)
-        print('Try "scancel --help" for more informatio')
+        print('Try "scancel --help" for more information')
         return
     if option[0] == '-':
         print("scancel: option requires an argument -- '%s'" % option[1:])
-        print('Try "scancel --help" for more informatio')
+        print('Try "scancel --help" for more information')
         return
 
 
