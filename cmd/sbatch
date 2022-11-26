@@ -816,7 +816,7 @@ Help options:
 
 
 def get_usage_info():
-    usage_info = '''Usage: [-N nnodes] [-n ntasks] [-b "HH:MM MM/DD/YY"]
+    usage_info = '''Usage: sbatch [-N nnodes] [-n ntasks] [-b "HH:MM MM/DD/YY"]
        [-c ncpus] [-p partition] [-e err] [--time=minutes]
        [-D path] [--mpi mpi_type] [--output file]
        [--open-mode={append|truncate}] [--error file] 

@@ -40,15 +40,32 @@ users can execute command "srun --pty -p queuename user_command" to submit an in
 
 
     $srun --usage
-    Usage: srun [-n ntasks] [-o out] 
+    Usage: srun [-n ntasks] [-o out][-b "HH:MM MM/DD/YY"]
             [--open-mode={append|truncate}] [-e err]
-            [-c ncpus] [-p partition] [-t minutes]
-            [-D path] [-J jobname][--gid=group]
+            [-c ncpus] [-p partition] [--priority=value][--pty]
+            [-t minutes] [-D path][-J jobname][--gid=group]
             [--dependency=type:jobid][--comment=name]
-            [--nodelist=hosts][--exclude=hosts]
-            [--prolog=fname] [--epilog=fname]
+            [--nodelist=hosts][--exclude=hosts][--export=env_vars]
+            [--prolog=fname] [--epilog=fname][--exclusive]
             [--gpus-per-task=n]
             executable [args...]
+
+INPUT ENVIRONMENT VARIABLES(lower priority than options):  
+
+    SRUN_CPUS_PER_TASK   same as -c
+    SLURM_DEPENDENCY     same as --dependency
+    SLURM_WORKING_DIR    same as -D
+    SLURM_EXPORT_ENV     same as --export
+    SLURM_STDERRMODE     same as -e
+    SLURM_EPILOG         same as --epilog
+    SLURM_JOB_NAME       same as -J
+    SLURM_NTASKS         same as -n
+    SLURM_STDOUTMODE     same as -i
+    SLURM_OPEN_MODE      same as --open-mode
+    SLURM_PARTITION      same as -p
+    SLURM_PROLOG         same as --prolog
+    SLURM_TIMELIMIT      same as -t
+    SLURM_GPUS_PER_TASK  same as --gpus-per-task
 
 Example:
     
@@ -66,16 +83,27 @@ the script to submit a mpi job. Supported mpi type includes openmpi, mpich, inte
 
     
     $sbatch --usage
-    Usage: sbatch [-N nnodes] [-n ntasks] 
-                [-c ncpus] [-p partition] [-t minutes]
-                [-D path] [--mpi mpi_type] [--output file]
-                [--open-mode={append|truncate}] [--error file] 
-                [--chdir=directory] [-J jobname] [--gid=group] 
-                [--dependency=type:jobid] [--comment=name] 
-                [--ntasks-per-node=n] [--nodelist=hosts]
-                [--exclude=hosts][--export[=names]] [--gpus-per-task=n]
-                executable [args...]
+    Usage: sbatch [-N nnodes] [-n ntasks] [-b "HH:MM MM/DD/YY"]
+            [-c ncpus] [-p partition] [-e err] [--time=minutes]
+            [-D path] [--mpi mpi_type] [--output file]
+            [--open-mode={append|truncate}] [--error file] 
+            [--priority=value] [--chdir=directory] [-J jobname] 
+            [--gid=group] [--dependency=type:jobid] [--comment=name]
+            [--ntasks-per-node=n] [--nodelist=hosts][--exclude=hosts] 
+            [--export[=names]] [--exclusive] [--gpus-per-task=n]
+            executable [args...]
                 
+INPUT ENVIRONMENT VARIABLES(lower priority than options): 
+
+    SBATCH_EXPORT          same as --export
+    SBATCH_ERROR           same as -e
+    SBATCH_JOB_NAME        same as -J
+    SBATCH_OUTPUT          same as -o
+    SBATCH_OPEN_MODE       same as --open-mode
+    SBATCH_PARTITION       same as -p
+    SBATCH_TIMELIMIT       same as -t
+    SBATCH_GPUS_PER_TASK   same as --gpus-per-task
+
 Example of normal job:
    
     # user script
@@ -119,6 +147,13 @@ For details, see the "HPC Product Documentation".
     Usage: squeue [--job jobid] [-n name] [-p partitions]
               [-t states] [-u user_name] [--usage] [-l]
               
+INPUT ENVIRONMENT VARIABLES(lower priority than options): 
+
+    SQUEUE_NAMES          same as -n
+    SQUEUE_STATES         same as -t
+    SQUEUE_USERS          same as -u
+    SQUEUE_PARTITION      same as -p
+
 Example:
 
     $squeue
@@ -143,6 +178,13 @@ The job state would be CANCELLED terminated by scancel.
     Usage: scancel [-n job_name] [-p partitions]
               [-t PENDING | RUNNING | SUSPENDED] [--usage] [-u user_name] [job_id]
                
+INPUT ENVIRONMENT VARIABLES(lower priority than options):  
+
+    SCANCEL_NAME          same as -n
+    SCANCEL_STATE         same as -t
+    SCANCEL_USER          same as -u
+    SCANCEL_PARTITION     same as -p  
+
 5.sinfo  
     The sinfo is used to query the node and partition information of the current cluster. (Slurm's partition
 does not correspond to Donau's queue. It provides convenient way for users to use Donau's queue by partition.)  
