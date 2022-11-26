@@ -40,15 +40,32 @@ python2/python3
     
     
     $srun --usage
-    Usage: srun [-n ntasks] [-o out] 
+    Usage: srun [-n ntasks] [-o out][-b "HH:MM MM/DD/YY"]
             [--open-mode={append|truncate}] [-e err]
-            [-c ncpus] [-p partition] [-t minutes]
-            [-D path] [-J jobname][--gid=group]
+            [-c ncpus] [-p partition] [--priority=value][--pty]
+            [-t minutes] [-D path][-J jobname][--gid=group]
             [--dependency=type:jobid][--comment=name]
-            [--nodelist=hosts][--exclude=hosts]
-            [--prolog=fname] [--epilog=fname]
+            [--nodelist=hosts][--exclude=hosts][--export=env_vars]
+            [--prolog=fname] [--epilog=fname][--exclusive]
             [--gpus-per-task=n]
             executable [args...]
+    
+支持输入环境变量(优先级低于命令选项):  
+
+    SRUN_CPUS_PER_TASK   同 -c
+    SLURM_DEPENDENCY     同 --dependency
+    SLURM_WORKING_DIR    同 -D
+    SLURM_EXPORT_ENV     同 --export
+    SLURM_STDERRMODE     同 -e
+    SLURM_EPILOG         同 --epilog
+    SLURM_JOB_NAME       同 -J
+    SLURM_NTASKS         同 -n
+    SLURM_STDOUTMODE     同 -i
+    SLURM_OPEN_MODE      同 --open-mode
+    SLURM_PARTITION      同 -p
+    SLURM_PROLOG         同 --prolog
+    SLURM_TIMELIMIT      同 -t
+    SLURM_GPUS_PER_TASK  同 --gpus-per-task
     
 举例:
     
@@ -66,16 +83,28 @@ $CCS_MPI_OPTIONS。
     
     
     $sbatch --usage
-    Usage: sbatch [-N nnodes] [-n ntasks] 
-                [-c ncpus] [-p partition] [-t minutes]
-                [-D path] [--mpi mpi_type] [--output file]
-                [--open-mode={append|truncate}] [--error file] 
-                [--chdir=directory] [-J jobname] [--gid=group] 
-                [--dependency=type:jobid] [--comment=name] 
-                [--ntasks-per-node=n] [--nodelist=hosts]
-                [--exclude=hosts][--export[=names]] [--gpus-per-task=n]
-                executable [args...]
+    Usage: sbatch [-N nnodes] [-n ntasks] [-b "HH:MM MM/DD/YY"]
+            [-c ncpus] [-p partition] [-e err] [--time=minutes]
+            [-D path] [--mpi mpi_type] [--output file]
+            [--open-mode={append|truncate}] [--error file] 
+            [--priority=value] [--chdir=directory] [-J jobname] 
+            [--gid=group] [--dependency=type:jobid] [--comment=name]
+            [--ntasks-per-node=n] [--nodelist=hosts][--exclude=hosts] 
+            [--export[=names]] [--exclusive] [--gpus-per-task=n]
+            executable [args...]
                 
+支持输入环境变量(优先级低于命令选项):  
+
+    SBATCH_EXPORT          同 --export
+    SBATCH_ERROR           同 -e
+    SBATCH_JOB_NAME        同 -J
+    SBATCH_OUTPUT          同 -o
+    SBATCH_OPEN_MODE       同 --open-mode
+    SBATCH_PARTITION       同 -p
+    SBATCH_TIMELIMIT       同 -t
+    SBATCH_GPUS_PER_TASK   同 --gpus-per-task
+
+
 普通作业举例:
    
     #脚本文件  
@@ -120,6 +149,13 @@ STOPPED。显示结果中"NODELIST(REASON)"的未调度原因，直接使用DONA
     Usage: squeue [--job jobid] [-n name] [-p partitions]
               [-t states] [-u user_name] [--usage] [-l]   
 
+支持输入环境变量(优先级低于命令选项):  
+
+    SQUEUE_NAMES          同 -n
+    SQUEUE_STATES         同 -t
+    SQUEUE_USERS          同 -u
+    SQUEUE_PARTITION      同 -p
+
 举例:
 
 
@@ -146,7 +182,14 @@ STOPPED。显示结果中"NODELIST(REASON)"的未调度原因，直接使用DONA
      Usage: scancel [-n job_name] [-p partitions]
               [-t PENDING | RUNNING | SUSPENDED] [--usage] [-u user_name] [job_id]  
     
-    
+支持输入环境变量(优先级低于命令选项):  
+
+    SCANCEL_NAME          同 -n
+    SCANCEL_STATE         同 -t
+    SCANCEL_USER          同 -u
+    SCANCEL_PARTITION     同 -p    
+
+
 5.sinfo命令  
     sinfo用于查询当前集群的节点和分区信息(SLURM的PARTITION和DONAU的QUEUE是两种概念，为了用户对指定QUEUE
 进行操作，将QUEUE和PARTITION对应)。
