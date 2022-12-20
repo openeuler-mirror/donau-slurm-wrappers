@@ -80,14 +80,14 @@ def convert_timeout(time_out):
         if time_out_af.count(':') == 2:
             timeout_hms = time_out_af.strip().split(':')
             seconds = int(timeout_hms[2]) % 60
-            minutes = (int(timeout_hms[1]) + int(timeout_hms[2]) / 60) % 60
+            minutes = (int(timeout_hms[1]) + int(timeout_hms[2]) // 60) % 60
             hours = int(time_out_be) * 24 + int(timeout_hms[0]) \
-                    + (int(timeout_hms[1]) + int(timeout_hms[2]) / 60) / 60
+                    + (int(timeout_hms[1]) + int(timeout_hms[2]) // 60) // 60
             timeout_converted += str(hours) + 'h' + str(minutes) + 'm' + str(seconds) + 's'
         elif time_out_af.count(':') == 1:
             timeout_hm = time_out_af.strip().split(':')
             minutes = int(timeout_hm[1]) % 60
-            hours = int(time_out_be) * 24 + int(timeout_hm[0]) + int(timeout_hm[1]) / 60
+            hours = int(time_out_be) * 24 + int(timeout_hm[0]) + int(timeout_hm[1]) // 60
             timeout_converted += str(hours) + 'h' + str(minutes) + 'm'
     elif '-' in time_out:
         time_out_d, time_out_h = time_out.strip().split('-')
@@ -97,22 +97,22 @@ def convert_timeout(time_out):
         if time_out.count(':') == 2:
             timeout_hms = time_out.strip().split(':')
             seconds = int(timeout_hms[2]) % 60
-            minutes = (int(timeout_hms[1]) + int(timeout_hms[2]) / 60) % 60
-            hours = int(timeout_hms[0]) + (int(timeout_hms[1]) + int(timeout_hms[2]) / 60) / 60
+            minutes = (int(timeout_hms[1]) + int(timeout_hms[2]) // 60) % 60
+            hours = int(timeout_hms[0]) + (int(timeout_hms[1]) + int(timeout_hms[2]) // 60) // 60
             timeout_converted += str(hours) + 'h' + str(minutes) + 'm' + str(seconds) + 's'
         elif time_out.count(':') == 1:
             timeout_ms = time_out.strip().split(':')
             seconds = int(timeout_ms[1]) % 60
-            minutes = (int(timeout_ms[0]) + int(timeout_ms[1]) / 60) % 60
-            if (int(timeout_ms[0]) + int(timeout_ms[1]) / 60) / 60 > 0:
-                hours = (int(timeout_ms[0]) + int(timeout_ms[1]) / 60) / 60
+            minutes = (int(timeout_ms[0]) + int(timeout_ms[1]) // 60) % 60
+            if (int(timeout_ms[0]) + int(timeout_ms[1]) // 60) // 60 > 0:
+                hours = (int(timeout_ms[0]) + int(timeout_ms[1]) // 60) // 60
                 timeout_converted += str(hours) + 'h' + str(minutes) + 'm' + str(seconds) + 's'
             else:
                 timeout_converted += str(minutes) + 'm' + str(seconds) + 's'
     else:
-        if int(time_out) / 60 > 0:
+        if int(time_out) // 60 > 0:
             minutes = int(time_out) % 60
-            hours = int(time_out) / 60
+            hours = int(time_out) // 60
             timeout_converted += str(hours) + 'h' + str(minutes) + 'm'
         else:
             timeout_converted += time_out + 'm'
