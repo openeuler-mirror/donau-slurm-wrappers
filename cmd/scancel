@@ -1,0 +1,376 @@
+#!/usr/bin/env python
+import getopt
+import os
+import pwd
+import re
+import sys
+
+
+# global variables stored options value
+is_debug = False
+log_file = ''
+djob_path = ''
+job_ids = []
+job_name = ''
+job_state = ''
+job_user = ''
+job_partition = ''
+final_err_info = []
+# display items
+DISPLAY_ID = 'ID'
+DISPLAY_NAME = 'NAME'
+DISPLAY_USER = 'USER'
+DISPLAY_STATE = 'STATE'
+DISPLAY_QUEUE = 'QUEUE'
+# index of djob results
+JOB_QUERY_ID_INDEX = 0
+JOB_QUERY_NAME_INDEX = 1
+JOB_QUERY_USER_INDEX = 2
+JOB_QUERY_STATE_INDEX = 3
+JOB_QUERY_QUEUE_INDEX = 4
+JOB_QUERY_IEN = 8
+
+
+def get_help_info():
+    help_info = '''Usage: scancel [OPTIONS] [job_id]
+  -n, --name=job_name             terminate jobs with this name
+  -p, --partition=partition       terminate jobs in this partition
+  -t, --state=states              terminate jobs in this state, only support PENDING, RUNNING and SUSPENDED
+  -u, --user=user_name            terminate jobs of this user,
+                                  this option only takes effect while user is administrator
+
+Help options:
+  --help                          show this help message
+  --usage                         display brief usage message'''
+    return help_info
+
+
+def get_usage_info():
+    usage_info = '''Usage: scancel [-n job_name] [-p partitions]
+              [-t PENDING | RUNNING | SUSPENDED] [--usage] [-u user_name] [job_id]'''
+    return usage_info
+
+
+def log(content):
+    if is_debug:
+        f = open(log_file, 'a+')
+        f.write(content + '\n')
+        f.close()
+
+
+def init_log_file_name():
+    global log_file
+    file_name = '%s.%d.%d' % ('scancel', os.getuid(), os.getpid())
+    log_file = os.path.join('/tmp/', file_name)
+
+
+def print_single_option(option):
+    if len(option) < 2:
+        return
+    if option.startswith('--'):
+        print("scancel: option '%s' requires an argument" % option)
+        print('Try "scancel --help" for more information')
+        return
+    if option[0] == '-':
+        print("scancel: option requires an argument -- '%s'" % option[1:])
+        print('Try "scancel --help" for more information')
+        return
+
+
+def get_invalid_option(err_message):
+    if 'not recognized' in err_message:
+        options = re.findall(r'option (.*) not recognized', err_message)
+        if len(options) == 1:
+            return options[0]
+    if 'requires argument' in err_message:
+        options = re.findall(r'option (.*) requires argument', err_message)
+        if len(options) == 1:
+            print_single_option(options[0])
+            sys.exit(1)
+    return ''
+
+
+def print_invalid_option(option):
+    if len(option) == 0:
+        return
+    if len(option) > 1 and option[1] == '-':
+        print("scancel: invalid option '" + option + "'")
+    else:
+        print("scancel: invalid option -- '" + option[1:] + "'")
+    print('''Try "scancel --help" for more information''')
+
+
+# init options from environment
+def init_config_with_env():
+    global is_debug
+    debug_env = os.getenv('SLURM_TO_DONAU_DEBUG')
+    if debug_env is not None and debug_env.lower() == 'true':
+        is_debug = True
+        init_log_file_name()
+
+    global job_name
+    job_name_env = os.getenv('SCANCEL_NAME')
+    if job_name_env is not None:
+        log('get job name from environment: ' + job_name_env)
+        job_name = job_name_env
+
+    global job_state
+    job_state_env = os.getenv('SCANCEL_STATE')
+    if job_state_env is not None:
+        log('get job state from environment: ' + job_state_env)
+        if job_state_env.upper() not in ['PD', 'PENDING', 'R', 'RUNNING', 'S', 'SUSPENDED']:
+            print_invalid_env_state(job_state_env)
+            sys.exit(1)
+        job_state = job_state_env
+
+    global job_user
+    job_user_env = os.getenv('SCANCEL_USER')
+    if job_user_env is not None:
+        log('get job user from environment: ' + job_user_env)
+        job_user = job_user_env
+
+    global job_partition
+    job_partition_env = os.getenv('SCANCEL_PARTITION')
+    if job_partition_env is not None:
+        log('get job users from environment: ' + job_partition_env)
+        job_partition = job_partition_env
+
+
+def is_administrator():
+    cmd = 'dadmin show config -n cluster.administrators'
+    output = os.popen(cmd).read()
+    out_infos = output.splitlines()
+    if len(out_infos) == 1:
+        print(out_infos[0])
+        sys.exit(1)
+    if len(out_infos) == 2:
+        value_infos = out_infos[1].split()
+        if len(value_infos) == 3:
+            name_item_str = value_infos[0]
+            value_item_str = value_infos[2]
+            return name_item_str == 'cluster.administrators' and value_item_str == pwd.getpwuid(os.getuid())[0]
+    return False
+
+
+def check_user(user_name):
+    try:
+         pwd.getpwnam(user_name)
+    except KeyError:
+        print('scancel: error: Invalid user name: %s' % user_name)
+        sys.exit(1)
+
+
+def print_invalid_state(state):
+    print('Invalid job state specified: %s' % state)
+    print('Valid job states are PENDING, RUNNING, and SUSPENDED')
+
+
+def print_invalid_env_state(state):
+    print('Unrecognized SCANCEL_STATE value: %s' % state)
+    print('Valid job states are PENDING, RUNNING, and SUSPENDED')
+
+
+def convert_job_state(slurm_job_state):
+    if slurm_job_state == 'R' or slurm_job_state == 'RUNNING':
+        return ['RUNNING']
+    if slurm_job_state == 'PD' or slurm_job_state == 'PENDING':
+        return ['PENDING', 'WAITING']
+    if slurm_job_state == 'S' or slurm_job_state == 'SUSPENDED':
+        return ['STOPPED']
+    return []
+
+
+def check_result_error(out_line):
+    global final_err_info
+    # check permission
+    if 'access to job' in out_line:
+        err_info = out_line.split()
+        if len(err_info) > 1:
+            print('scancel: error: Kill job error: %s' % ' '.join(err_info[1:]))
+        return False
+    # for token expired and not exist error, it should be displayed
+    if 'not exist' in out_line and 'access token' not in out_line and 'token expired' not in out_line:
+        return False
+    if out_line.startswith('--'):
+        return False
+    out_job_info = out_line.split()
+    if len(out_job_info) > 0 and out_job_info[0].isdigit():
+        return True
+    if len(out_job_info) > 0 and out_job_info[0] == 'JOB_ID':
+        return False
+    final_err_info.append(out_line)
+    return False
+
+
+def parse_job_info(line):
+    job_info = {}
+    info = line.split()
+    if len(info) < JOB_QUERY_IEN:
+        return job_info
+    # filter job_name
+    name = info[JOB_QUERY_NAME_INDEX]
+    job_info[DISPLAY_NAME] = name
+    job_info[DISPLAY_ID] = info[JOB_QUERY_ID_INDEX]
+    job_info[DISPLAY_USER] = info[JOB_QUERY_USER_INDEX]
+    job_info[DISPLAY_STATE] = info[JOB_QUERY_STATE_INDEX]
+    job_info[DISPLAY_QUEUE] = info[JOB_QUERY_QUEUE_INDEX]
+    return job_info
+
+
+def parse_query_result(query_lines):
+    local_job_dict = {}
+    if len(query_lines) <= 1:
+        return local_job_dict
+    valid_info = []
+    for info in query_lines:
+        if not check_result_error(info):
+            log('check djob result error: %s' % info)
+        else:
+            valid_info.append(info)
+
+    for line in valid_info:
+        info = parse_job_info(line)
+        if len(info) > 0 and info[DISPLAY_ID] is not None:
+            local_job_dict[info[DISPLAY_ID]] = info
+    return local_job_dict
+
+
+def get_job_dict():
+    global djob_path
+    query_command = djob_path
+    # check job users
+    # normal user could not cancel others' job
+    if len(job_user) > 0:
+        check_user(job_user)
+    if not is_administrator():
+        if len(job_user) > 0:
+            current_user_name = pwd.getpwuid(os.getuid())[0]
+            if current_user_name != job_user:
+                print('scancel: error: Kill job error: Access/permission denied')
+                sys.exit(1)
+    else:
+        if len(job_user) > 0:
+            query_command += ' -u ' + job_user
+        else:
+            # for administrator, all the jobs can be canceled
+            query_command += ' -u all '
+    # check job state
+    if len(job_state) > 0:
+        if job_state.upper() not in ['PD', 'PENDING', 'R', 'RUNNING', 'S', 'SUSPENDED']:
+            print_invalid_state(job_state)
+            sys.exit(1)
+        else:
+            donau_state = convert_job_state(job_state.upper())
+            if len(donau_state) > 0:
+                query_command += ' -s ' + '\'' + ' '.join(donau_state) + '\''
+    else:
+        donau_job_states = ['WAITING', 'PENDING', 'RUNNING', 'STOPPED']
+        query_command += ' -s ' + '\'' + ' '.join(donau_job_states) + '\''
+    # filter job partition
+    if len(job_partition) > 0:
+        query_command += ' -q ' + job_partition
+    # filter job name
+    if len(job_name) > 0:
+        query_command += ' -n ' + job_name
+    # add job ids
+    for id in job_ids:
+        query_command += ' ' + id
+    log('get query command: %s' % query_command)
+
+    # execute command
+    output = os.popen(query_command).read()
+    log('get output: %s' % output)
+    if 'no matches' in output:
+        return {}
+    return parse_query_result(output.splitlines())
+
+
+def cancel_jobs(cancel_job_dict):
+    if len(cancel_job_dict) == 0:
+        return
+    cancel_ids = cancel_job_dict.keys()
+    global djob_path
+    cancel_command = '%s -T %s > /dev/null' % (djob_path, ' '.join(cancel_ids))
+    log('cancel command : %s' % cancel_command)
+    # execute command
+    os.popen(cancel_command).read()
+
+
+def check_donau_cli_env():
+    sched_cli_home = os.getenv('CCSCHEDULER_CLI_HOME')
+    ccs_cli_home = os.getenv('CCS_CLI_HOME')
+    if sched_cli_home is None or ccs_cli_home is None:
+        print('cli env home is not configured, '
+              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
+        sys.exit(1)
+    global djob_path
+    djob_path = os.path.join(ccs_cli_home, 'bin', 'djob')
+    if not os.path.exists(djob_path):
+        print('djob path is not exist,'
+              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    if os.getuid() == 0:
+        print('Permission denied. The root user is not allowed to operate.')
+        sys.exit(1)
+    check_donau_cli_env()
+    init_config_with_env()
+    short_options = '-n:-t:-u:-p:'
+    long_options = ['help', 'name=', 'state=', 'user=', 'partition=', 'usage']
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], short_options, long_options)
+        # options from command have higher priority than environment
+        for opt_name, opt_value in opts:
+            if opt_name == '--help':
+                print(get_help_info())
+                sys.exit()
+            if opt_name == '--usage':
+                print(get_usage_info())
+                sys.exit()
+            if opt_name in ('-n', '--name'):
+                log('get job name from command options: %s' % opt_value)
+                job_name = opt_value
+            if opt_name in ('-t', '--state'):
+                log('get job state from command options: %s' % opt_value)
+                job_state = opt_value
+            if opt_name in ('-u', '--user'):
+                log('get job user from command options: %s' % opt_value)
+                job_user = opt_value
+            if opt_name in ('-p', '--partition'):
+                log('get job partition from command options %s' % opt_value)
+                job_partition = opt_value
+        # for scancel, remain args is all job ids
+        if len(args) == 0:
+            if len(job_user) == 0 and len(job_partition) == 0 and len(job_state) == 0 and len(job_name) == 0:
+                # scancel need at least 1 job id
+                print('scancel: error: No job identification provided')
+                sys.exit(1)
+        else:
+            '''
+            for job id format in scancel, it may support like:
+            1) scancel id1 id2 id3 ...
+            2) scancel id1,id2,id3 ...
+            3) scancel id1,id2 id3 ...
+            '''
+            for arg in args:
+                job_id_list = arg.split(',')
+                for id in job_id_list:
+                    log('get job id from command: %s' % id)
+                    if not id.isdigit():
+                        print('scancel: error: Invalid job id %s specified' % id)
+                        sys.exit(1)
+                    job_ids.append(id)
+    except getopt.GetoptError as err:
+        invalid_option = get_invalid_option(str(err))
+        if len(invalid_option) != 0:
+            print_invalid_option(invalid_option)
+            sys.exit(1)
+        else:
+            print(str(err))
+
+    job_dict = get_job_dict()
+    cancel_jobs(job_dict)
+    for err_info in final_err_info:
+        print(err_info)
