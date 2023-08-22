@@ -299,13 +299,8 @@ def cancel_jobs(cancel_job_dict):
 def check_donau_cli_env():
     sched_cli_home = os.getenv('CCSCHEDULER_CLI_HOME')
     ccs_cli_home = os.getenv('CCS_CLI_HOME')
-    ca_cert_perm = os.getenv('CURL_CA_BUNDLE')
-    if sched_cli_home is None or ccs_cli_home is None or ca_cert_perm is None:
+    if sched_cli_home is None or ccs_cli_home is None:
         print('cli env home is not configured, '
-              'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
-        sys.exit(1)
-    if ca_cert_perm is None:
-        print('cli ca_cert_perm is not specified,'
               'source configure \'profile.env\'(bash) or \'cshrc.env\'(csh) first')
         sys.exit(1)
     global djob_path
